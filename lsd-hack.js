@@ -1,7 +1,7 @@
-import { getRunnableServers } from "lib/explore.js"
-import { isHackable } from "lib/hackable.js"
-import { profitableServer } from "lib/profitable.js"
-import { h4ck } from "lib/break.js"
+import { getRunnableServers } from "lib/explore.js";
+import { isHackable } from "lib/hackable.js";
+import { profitableServer } from "lib/profitable.js";
+import { h4ck } from "lib/break.js";
 
 /** @param {NS} ns */
 export async function main(ns) {
@@ -16,25 +16,32 @@ export async function main(ns) {
   if (ns.args.length >= 2) {
     useHome = !(ns.args[1] == "dont");
   }
-  
+
   ns.tprint("Going to bootstrap against " + mostProfitableServer);
 
   const runnableServers = await getRunnableServers(ns);
 
   // First make sure we've broken the servers as far as we can
   for (var i = 0; i < runnableServers.length; i++) {
-    await h4ck(ns, runnableServers[i])
+    await h4ck(ns, runnableServers[i]);
   }
+  await h4ck(ns, mostProfitableServer);
 
   useHome && runnableServers.push("home");
 
   // We count how many threads in total can we run in our network
   const { totalThreads, threadsPerServer } = calculateThreads(ns, runnableServers);
 
-  const threadMultipliers = { grow: 20, weaken: 4, hack: 1 }
+  const threadMultipliers = { grow: 20, weaken: 4, hack: 1 };
 
-  const totalGroups = Math.floor(totalThreads / (threadMultipliers.grow + threadMultipliers.weaken + threadMultipliers.hack));
-  const needs = { grow: totalGroups * threadMultipliers.grow, weaken: totalGroups * threadMultipliers.weaken, hack: totalGroups * threadMultipliers.hack };
+  const totalGroups = Math.floor(
+    totalThreads / (threadMultipliers.grow + threadMultipliers.weaken + threadMultipliers.hack),
+  );
+  const needs = {
+    grow: totalGroups * threadMultipliers.grow,
+    weaken: totalGroups * threadMultipliers.weaken,
+    hack: totalGroups * threadMultipliers.hack,
+  };
   const haves = { grow: 0, weaken: 0, hack: 0 };
   let toRun = {};
 
@@ -118,7 +125,7 @@ function calculateThreads(ns, runnableServers) {
     const server = runnableServers[i];
     let availableMemory = ns.getServerMaxRam(server);
     if (server == "home") {
-      (ns.getServerMaxRam(server) - ns.getServerUsedRam(server)) - 32;
+      ns.getServerMaxRam(server) - ns.getServerUsedRam(server) - 32;
     }
     const threads = Math.floor(availableMemory / scriptMemory);
 

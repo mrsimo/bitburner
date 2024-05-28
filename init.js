@@ -1,5 +1,5 @@
-import { getRunnableServers } from "lib/explore.js"
-import { h4ck } from "lib/break.js"
+import { getRunnableServers } from "lib/explore.js";
+import { h4ck } from "lib/break.js";
 
 /** @param {NS} ns */
 export async function main(ns) {
@@ -9,7 +9,7 @@ export async function main(ns) {
   // Wait until hacking level 10 to do anything else
   while (ns.getHackingLevel() < 10) {
     await ns.sleep(1000);
-  };
+  }
 
   let runnableServers = await getRunnableServers(ns);
 

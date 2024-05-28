@@ -41,7 +41,8 @@ class MasterProcess {
         .ensure(
           "share.js",
           Math.floor(
-            (this.totalMemory / ns.getScriptRam("share.js")) * (this.settings.sharePercent / 100),
+            (this.totalOtherMemory / ns.getScriptRam("share.js")) *
+              (this.settings.sharePercent / 100),
           ),
           false,
         )
@@ -78,20 +79,30 @@ class MasterProcess {
       let parameters;
 
       const procsRunning = this.servers.flatMap((server) => {
-        server.procs.filter(
-          (proc) =>
-            proc.args[0] == target.hostname &&
-            [
-              "hack-hack.js",
-              "hack-grow.js",
-              "hack-weaken.js",
-              "hack-weak1.js",
-              "hack-weak2.js",
-            ].includes(proc.script),
+        return (
+          server.procs.filter(
+            (proc) =>
+              proc.args[0] == target.hostname &&
+              [
+                "hack-hack.js",
+                "hack-grow.js",
+                "hack-weaken.js",
+                "hack-weak1.js",
+                "hack-weak2.js",
+              ].includes(proc.script),
+          ) || []
         );
       });
 
+      ns.printf(
+        "[keta] %s: %s, %s procs detected",
+        target.hostname,
+        config.status,
+        procsRunning.length,
+      );
+
       if (procsRunning.length > 0 && !config.status) {
+        ns.print(procsRunning);
         ns.printf(
           "[keta] %s is running something, but we have no status. Start from scratch.",
           target.hostname,
@@ -100,16 +111,19 @@ class MasterProcess {
         config.status = "unknown";
       }
 
+      this.watchdogs[target.hostname] ||= new Watchdog(ns, target, () => {
+        config.status = "drifted";
+        ns.printf("[keta] %s drifted.", target.hostname);
+        this.saveKetaConfig(ketaConfig);
+      });
+
       if (config.status == "running" || config.status == "primed") {
         parameters = ketaParameters(ns, target);
         this.ensureKetaRunning(target, parameters);
-        this.watchdogs[target.hostname] ||= new Watchdog(ns, target, () => {
-          config.status = "drifted";
-          ns.printf("[keta] %s drifted.", target.hostname);
-          this.saveKetaConfig(ketaConfig);
-        });
+        this.watchdogs[target.hostname].start();
         config.status = "running";
       } else if (config.status == "drifted") {
+        this.watchdogs[target.hostname].stop();
         parameters = ketaParameters(ns, target);
         this.ensureKetaShutdown(target, parameters);
         config.status = "priming";
@@ -141,8 +155,8 @@ class MasterProcess {
     primeManager.doneCondition = function (state) {
       return state.target.isPrimed();
     };
+    const stopManager = new Manager(this);
     primeManager.doneCallback = function (state) {
-      const stopManager = new Manager(this);
       stopManager.ensure("hack-weaken.js", 0, true, [target.hostname]);
       stopManager.ensure("hack-grow.js", 0, true, [target.hostname]);
       stopManager.run();
@@ -160,7 +174,10 @@ class MasterProcess {
     workManager.ensure("hack-weaken.js", 0, true, [target.hostname]);
 
     // We'll run one slot every two seconds
-    const numberOfSlots = Math.floor(parameters.cycleTime / 2000);
+    const numberOfSlots = Math.min(
+      Math.floor(this.totalOtherMemory / parameters.memoryPerSlot),
+      Math.floor(parameters.cycleTime / 2000),
+    );
 
     for (let slot = 0; slot < numberOfSlots; slot++) {
       workManager.ensure(
@@ -230,27 +247,36 @@ class MasterProcess {
     }
   }
 
-  /* privates */
   preloadServers() {
-    const _servers = getRunnableServers(ns);
+    const _servers = getRunnableServers(ns, false);
     this.servers = _servers.map((_server) => new Ser(ns, _server));
+    this.home = new Ser(ns, "home");
   }
 
-  get totalMemory() {
+  get totalHomeMemory() {
+    return this.home.maxRam;
+  }
+
+  get totalOtherMemory() {
     return this.servers.reduce((sum, server) => sum + server.maxRam, 0);
   }
 
-  get availableMemory() {
+  get availableHomeMemory() {
+    return this.home.availableMemory;
+  }
+
+  get availableOtherMemory() {
     return this.servers.reduce((sum, server) => sum + server.availableMemory, 0);
   }
 
   copyLibs() {
-    const files = ns.ls("home", "lib");
+    const files = ns.ls("home", "lib") + ns.ls("home", "keta");
     this.servers.forEach((server) => ns.scp(files, server.hostname));
   }
 
   silences() {
     ns.disableLog("sleep");
+    ns.disableLog("getServerUsedRam");
     ns.disableLog("getServerMaxRam");
     ns.disableLog("scan");
     ns.disableLog("scp");
@@ -260,11 +286,14 @@ class MasterProcess {
 
   header() {
     ns.tprintf(
-      "I have access to %s servers, with %s of %s (%s) of memory available.",
+      "Home: %s of %s (%s) available. %s accessible servers: %s of %s (%s) available.",
+      ns.formatRam(this.availableHomeMemory),
+      ns.formatRam(this.totalHomeMemory),
+      Math.round((this.availableHomeMemory / this.totalHomeMemory) * 100) + "%",
       this.servers.length,
-      ns.formatRam(this.availableMemory),
-      ns.formatRam(this.totalMemory),
-      Math.round((this.availableMemory / this.totalMemory) * 100) + "%",
+      ns.formatRam(this.availableOtherMemory),
+      ns.formatRam(this.totalOtherMemory),
+      Math.round((this.availableOtherMemory / this.totalOtherMemory) * 100) + "%",
     );
   }
 }
