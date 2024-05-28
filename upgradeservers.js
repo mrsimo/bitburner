@@ -19,7 +19,7 @@ export async function main(ns) {
     if (ns.getServerMaxRam(server) < ram) {
       await upgradeServer(ns, server, ram);
     } else {
-      ns.tprint(server + " already at expected memory size.")
+      ns.tprint(server + " already at expected memory size.");
     }
   }
 }
@@ -38,7 +38,7 @@ export async function upgradeServer(ns, server, ram) {
       if (result != "") {
         done = true;
       } else {
-        ns.tprint("Error buying server!!")
+        ns.tprint("Error buying server!!");
       }
     }
 

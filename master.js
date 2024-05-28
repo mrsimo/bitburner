@@ -1,6 +1,8 @@
 import { getRunnableServers } from "lib/explore.js";
 import Ser from "lib/ser.js";
 import Manager from "lib/manager.js";
+import Watchdog from "lib/watchdog.js";
+import { ketaParameters } from "lib/keta.js";
 
 import * as Helpers from "lib/helpers.js";
 
@@ -21,37 +23,42 @@ export async function main(_ns) {
 }
 
 class MasterProcess {
-  constructor(settings) { this.settings = settings; }
-
-  async run() {
-    ns.tprintf("I have access to %s servers, with %s of %s (%s) of memory available.",
-      this.servers.length,
-      ns.formatRam(this.availableMemory),
-      ns.formatRam(this.totalMemory),
-      Math.round(this.availableMemory / this.totalMemory * 100) + "%",
-    );
-
-    this.ensureShares(this.settings.sharePercent / 100);
-    if (this.settings.runHackNet) {
-      new Manager(this).ensure("mdma.js", 1);
-    }
-    if (this.settings.runStockMarket) {
-      new Manager(this).ensure("mari.js", 1);
-    }
-
-    // If we have access to formulas, run some more stuff
-    if (ns.fileExists("Formulas.exe", "home")) {
-      this.ensureKeta();
-    } else {
-      // we might want to be friendlier at the beginning and consider running the lsd way.
-    }
+  constructor(settings) {
+    this.settings = settings;
+    this.ns = ns;
+    this.watchdogs = {};
   }
 
-  ensureShares(fraction) {
-    new Manager().ensure(
-      "share.js",
-      Math.floor((this.totalMemory / ns.getScriptRam("share.js")) * fraction),
-    );
+  async run() {
+    this.silences();
+
+    while (true) {
+      this.preloadServers();
+      this.header();
+      this.copyLibs();
+
+      new Manager(this)
+        .ensure(
+          "share.js",
+          Math.floor(
+            (this.totalMemory / ns.getScriptRam("share.js")) * (this.settings.sharePercent / 100),
+          ),
+          false,
+        )
+        .run();
+      new Manager(this).ensure("mdma.js", this.settings.runHackNet ? 1 : 0, true).run();
+      new Manager(this).ensure("mari.js", this.settings.runStockMarket ? 1 : 0, true).run();
+
+      // If we have access to formulas, run some more stuff
+      if (ns.fileExists("Formulas.exe", "home")) {
+        this.ensureKeta();
+      } else {
+        // we might want to be friendlier at the beginning and consider running the lsd way.
+      }
+
+      // This is where we do the waiting between cycles
+      await this.checkWatchdogs();
+    }
   }
 
   /**
@@ -68,46 +75,52 @@ class MasterProcess {
     for (let _target in ketaConfig) {
       const target = new Ser(ns, _target);
       let config = ketaConfig[_target];
+      let parameters;
 
-      // We don't know what status we are, so start from scratch
-      switch (config.status) {
-        case 'running':
-          break;
-        case 'primed':
-          let workManager = new Manager(this, { config, target });
-          workManager.ensure(
+      const procsRunning = this.servers.flatMap((server) => {
+        server.procs.filter(
+          (proc) =>
+            proc.args[0] == target.hostname &&
+            [
+              "hack-hack.js",
+              "hack-grow.js",
+              "hack-weaken.js",
+              "hack-weak1.js",
+              "hack-weak2.js",
+            ].includes(proc.script),
+        );
+      });
 
-          )
-          work.doneCondition = function (state) {
-
-          }
-
-          break;
-        default:
-          let primeManager = new Manager(this, { config, target });
-          primeManager.ensure(
-            "hack-weaken.js",
-            Math.floor((this.totalMemory / ns.getScriptRam("hack-weaken.js")) * 0.05),
-            target.hostname
-          )
-          primeManager.ensure(
-            "hack-grow.js",
-            Math.floor((this.totalMemory / ns.getScriptRam("hack-grow.js")) * 0.05),
-            target.hostname
-          )
-          primeManager.doneCondition = function (state) {
-            state.server.isPrimed()
-          }
-          primeManager.doneCallback = function (state) {
-            const stopManager = new Manager();
-            stopManager.ensure("hack-weaken.js", 0, target.hostname);
-            stopManager.ensure("hack-grow.js", 0, target.hostname);
-
-            state.config.status = 'primed'
-          }
-          break;
+      if (procsRunning.length > 0 && !config.status) {
+        ns.printf(
+          "[keta] %s is running something, but we have no status. Start from scratch.",
+          target.hostname,
+        );
+        procsRunning.forEach((proc) => ns.kill(proc.pid));
+        config.status = "unknown";
       }
-      saveKetaConfig(config);
+
+      if (config.status == "running" || config.status == "primed") {
+        parameters = ketaParameters(ns, target);
+        this.ensureKetaRunning(target, parameters);
+        this.watchdogs[target.hostname] ||= new Watchdog(ns, target, () => {
+          config.status = "drifted";
+          ns.printf("[keta] %s drifted.", target.hostname);
+          this.saveKetaConfig(ketaConfig);
+        });
+        config.status = "running";
+      } else if (config.status == "drifted") {
+        parameters = ketaParameters(ns, target);
+        this.ensureKetaShutdown(target, parameters);
+        config.status = "priming";
+      } else {
+        if (config.status != "priming") {
+          ns.printf("[keta] Priming %s.", target.hostname);
+        }
+        this.ensureKetaPrimed(target, config);
+      }
+
+      this.saveKetaConfig(ketaConfig);
     }
   }
 
@@ -115,96 +128,112 @@ class MasterProcess {
     ns.write("keta.json", JSON.stringify(config), "w");
   }
 
-  ensureNoPrime(target) {
-    this.ensure("hack-weaken.js", 0, target.hostname);
-    this.ensure("hack-grow.js", 0, target.hostname);
+  ensureKetaPrimed(target, config) {
+    let primeManager = new Manager(this, { config, target });
+
+    // Enough to weaken 80 points.
+    primeManager.ensure("hack-weaken.js", target.threadsToWeaken(80), true, [target.hostname]);
+    // Enough to bring back to top money from $0.
+    primeManager.ensure("hack-grow.js", target.threadsToGoBackToFullMoney(), true, [
+      target.hostname,
+    ]);
+
+    primeManager.doneCondition = function (state) {
+      return state.target.isPrimed();
+    };
+    primeManager.doneCallback = function (state) {
+      const stopManager = new Manager(this);
+      stopManager.ensure("hack-weaken.js", 0, true, [target.hostname]);
+      stopManager.ensure("hack-grow.js", 0, true, [target.hostname]);
+      stopManager.run();
+
+      ns.printf("[keta] %s primed.", target.hostname);
+      state.config.status = "primed";
+    };
+    config.status = "priming";
+    primeManager.run();
+  }
+
+  ensureKetaRunning(target, parameters) {
+    const workManager = new Manager(this);
+    workManager.ensure("hack-grow.js", 0, true, [target.hostname]);
+    workManager.ensure("hack-weaken.js", 0, true, [target.hostname]);
+
+    // We'll run one slot every two seconds
+    const numberOfSlots = Math.floor(parameters.cycleTime / 2000);
+
+    for (let slot = 0; slot < numberOfSlots; slot++) {
+      workManager.ensure(
+        "hack-hack.js",
+        parameters.hackThreads,
+        false,
+        [target.hostname, slot, parameters.hackStartTime, parameters.cycleTime],
+        [target.hostname, slot],
+      );
+      workManager.ensure(
+        "hack-weak1.js",
+        parameters.hackWeakenThreads,
+        false,
+        [target.hostname, slot, parameters.hackWeakenStartTime, parameters.cycleTime],
+        [target.hostname, slot],
+      );
+      workManager.ensure(
+        "hack-grow.js",
+        parameters.growThreads,
+        false,
+        [target.hostname, slot, parameters.growStartTime, parameters.cycleTime],
+        [target.hostname, slot],
+      );
+      workManager.ensure(
+        "hack-weak2.js",
+        parameters.growWeakenThreads,
+        false,
+        [target.hostname, slot, parameters.growWeakenStartTime, parameters.cycleTime],
+        [target.hostname, slot],
+      );
+    }
+    workManager.run();
+  }
+
+  ensureKetaShutdown(target, parameters) {
+    const workManager = new Manager(this);
+    const numberOfSlots = Math.floor(parameters.cycleTime / 2000);
+
+    for (let slot = 0; slot < numberOfSlots; slot++) {
+      workManager.ensure("hack-hack.js", 0, false, [], [target.hostname, slot]);
+      workManager.ensure(
+        "hack-weak1.js",
+        parameters.hackWeakenThreads,
+        false,
+        [target.hostname, slot, parameters.hackWeakenStartTime, parameters.cycleTime],
+        [target.hostname, slot],
+      );
+      workManager.ensure(
+        "hack-grow.js",
+        parameters.growThreads,
+        false,
+        [target.hostname, slot, parameters.growStartTime, parameters.cycleTime],
+        [target.hostname, slot],
+      );
+      workManager.ensure("hack-weak2.js", 0, false, [], [target.hostname, slot]);
+    }
+    workManager.run();
+  }
+
+  async checkWatchdogs() {
+    const start = new Date();
+    while (new Date() - start < 20000) {
+      await ns.sleep(100 + Math.random() * 400);
+      for (let dog in this.watchdogs) {
+        this.watchdogs[dog].tick();
+      }
+    }
   }
 
   /* privates */
-
-  /**
-   * Makes sure a certain amount of threads of a script is running accross our servers. Kills and starts new ones as necessary.
-   *
-   * @param script - Name of the script to run
-   * @param threads - Amount of threads to run
-   * @param args - Arguments to compare against
-   */
-  ensure(script, threads, ...args) {
-    // Copy the script everywhere
-    this.servers.forEach((server) => { ns.scp(script, server.hostname) });
-
-    // Check how many are running already
-    const runningIn = this.servers
-      .map(
-        (server) => {
-          let procs = server.procs().filter((proc) => proc.filename == script && this.sameArgs(args, proc.args));
-
-          return {
-            server: server,
-            procs: procs,
-            threads: procs.reduce((sum, proc) => sum + proc.threads, 0)
-          };
-        })
-      .filter((a) => a.threads > 0)
-
-    let currentlyRunning = runningIn.reduce((sum, a) => sum + a.threads, 0);
-
-    ns.tprintf("'%s' with %s args should run %s threads, is currently running %s threads. ", script, args, threads, currentlyRunning);
-
-    if (currentlyRunning == threads) { return; }
-
-    if (currentlyRunning > threads) {
-      // Kill some
-      for (let i = 0; i < runningIn.length; i++) {
-        if (currentlyRunning <= threads) { break; }
-        for (let j = 0; j < runningIn[i].procs.length; j++) {
-          if (currentlyRunning <= threads) { break; }
-
-          let proc = runningIn[i].procs[j];
-          currentlyRunning = currentlyRunning - proc.threads;
-          ns.kill(proc.pid);
-        }
-      }
-    }
-
-    if (currentlyRunning < threads) {
-      // Start some
-      const scriptMemory = ns.getScriptRam(script);
-      let remaining = threads - currentlyRunning;
-
-      this.servers.forEach((server) => {
-        const available = server.availableMemory;
-        const canRun = Math.floor(available / scriptMemory);
-        if (canRun > 0 && remaining > 0) {
-          const toRun = Math.min(canRun, remaining);
-          ns.exec(script, server.hostname, toRun, ...args);
-          remaining = remaining - toRun;
-        }
-      });
-    }
-  }
-
-  /**
-   * Checks if the first list of args is a subset of the first. The proc might have
-   * more args, but we just compare the first few.
-   *
-   * @param args - args to compare from
-   * @param procArgs - args to compare to
-   */
-  sameArgs(args, procArgs) {
-    let same = true;
-    for (let i = 0; i < args.length; i++) {
-      if (args[i] != procArgs[i]) { return false; }
-    }
-
-    return true;
-  }
-
-
-  get servers() {
+  preloadServers() {
     const _servers = getRunnableServers(ns);
-
-    return _servers.map((_server) => new Ser(ns, _server));;
+    this.servers = _servers.map((_server) => new Ser(ns, _server));
   }
 
   get totalMemory() {
@@ -213,5 +242,29 @@ class MasterProcess {
 
   get availableMemory() {
     return this.servers.reduce((sum, server) => sum + server.availableMemory, 0);
+  }
+
+  copyLibs() {
+    const files = ns.ls("home", "lib");
+    this.servers.forEach((server) => ns.scp(files, server.hostname));
+  }
+
+  silences() {
+    ns.disableLog("sleep");
+    ns.disableLog("getServerMaxRam");
+    ns.disableLog("scan");
+    ns.disableLog("scp");
+    ns.disableLog("kill");
+    ns.disableLog("exec");
+  }
+
+  header() {
+    ns.tprintf(
+      "I have access to %s servers, with %s of %s (%s) of memory available.",
+      this.servers.length,
+      ns.formatRam(this.availableMemory),
+      ns.formatRam(this.totalMemory),
+      Math.round((this.availableMemory / this.totalMemory) * 100) + "%",
+    );
   }
 }

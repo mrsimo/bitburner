@@ -2,9 +2,7 @@ import { getRunnableServers } from "lib/explore.js";
 import { profitableServer } from "lib/profitable.js";
 import { h4ck } from "lib/break.js";
 import { pkill } from "lib/kill.js";
-
-// Tweak to spread a script finish times more or less.
-const PadTime = 300;
+import { parametersForPercent } from "lib/keta.js";
 
 /** @param {NS} ns */
 export async function main(ns) {
@@ -20,22 +18,35 @@ export async function main(ns) {
   let player = ns.getPlayer();
 
   if (target.moneyMax > target.moneyAvailable || target.minDifficulty < target.hackDifficulty) {
-    ns.tprintf("Target server isn't at minimum security and maximum money yet. Running the hackiest fixer");
-    
+    ns.tprintf(
+      "Target server isn't at minimum security and maximum money yet. Running the hackiest fixer",
+    );
+
     await h4ck(ns, target.hostname);
 
     let availableMemory = ns.getServerMaxRam("home") - ns.getServerUsedRam("home") - 32; // use all but 32GB
 
-    ns.run("hack-grow.js", Math.floor(availableMemory / 2 / ns.getScriptRam("hack-grow.js")), target.hostname);
-    ns.run("hack-weaken.js", Math.floor(availableMemory / 2 / ns.getScriptRam("hack-weaken.js")), target.hostname);
+    ns.run(
+      "hack-grow.js",
+      Math.floor((availableMemory * 0.05) / ns.getScriptRam("hack-grow.js")),
+      target.hostname,
+    );
+    ns.run(
+      "hack-weaken.js",
+      Math.floor((availableMemory * 0.05) / ns.getScriptRam("hack-weaken.js")),
+      target.hostname,
+    );
 
     ns.tprint("Waiting until server is primed");
 
     while (true) {
       await ns.sleep(200);
 
-      let updatedTarget = ns.getServer(target.hostname)
-      if (updatedTarget.moneyMax == updatedTarget.moneyAvailable && updatedTarget.minDifficulty == updatedTarget.hackDifficulty) {
+      let updatedTarget = ns.getServer(target.hostname);
+      if (
+        updatedTarget.moneyMax == updatedTarget.moneyAvailable &&
+        updatedTarget.minDifficulty == updatedTarget.hackDifficulty
+      ) {
         pkill(ns, "hack-grow.js", "home", ts);
         pkill(ns, "hack-weaken.js", "home", ts);
 
@@ -52,7 +63,7 @@ export async function main(ns) {
 
   // First make sure we've broken the servers as far as we can
   for (var i = 0; i < runnableServers.length; i++) {
-    await h4ck(ns, runnableServers[i])
+    await h4ck(ns, runnableServers[i]);
   }
 
   runnableServers << ns.getServer("home");
@@ -73,7 +84,11 @@ export async function main(ns) {
     let found = false;
     for (let percent = 25; percent <= 100; percent++) {
       let parameters = parametersForPercent(ns, percent, player, target);
-      let necessaryThreads = parameters.growThreads + parameters.hackThreads + parameters.growWeakenThreads + parameters.hackWeakenThreads;
+      let necessaryThreads =
+        parameters.growThreads +
+        parameters.hackThreads +
+        parameters.growWeakenThreads +
+        parameters.hackWeakenThreads;
 
       if (necessaryThreads > maxThreads) {
         break;
@@ -83,7 +98,11 @@ export async function main(ns) {
     }
 
     if (lastParametersFound.percent > 0) {
-      ns.printf("%s: supports running hack for %s percent", server.hostname, lastParametersFound.percent);
+      ns.printf(
+        "%s: supports running hack for %s percent",
+        server.hostname,
+        lastParametersFound.percent,
+      );
       await boot(ns, server, lastParametersFound, target, slot);
       slot++;
     } else {
@@ -92,7 +111,15 @@ export async function main(ns) {
   }
 
   const weakenTime = ns.formulas.hacking.weakenTime(target, player);
-  ns.tprint(ns.sprintf("%s - %s: I've booted %s slots in a cycle that lasts %s", new Date().toISOString(), ts, slot + 1, ns.tFormat(weakenTime + 2000)));
+  ns.tprint(
+    ns.sprintf(
+      "%s - %s: I've booted %s slots in a cycle that lasts %s",
+      new Date().toISOString(),
+      ts,
+      slot + 1,
+      ns.tFormat(weakenTime + 2000),
+    ),
+  );
 
   // I was told to start the watchdog process. clean-shutdown.
   if (watchdog) {
@@ -101,79 +128,8 @@ export async function main(ns) {
 }
 
 /** @param {NS} ns */
-function parametersForPercent(ns, percent, player, target) {
-  // Get times for each of these. These only depend on target server and
-  // player hack skill. Doesn't depend on the server that we run the hacks from.
-  const hackTime = ns.formulas.hacking.hackTime(target, player);
-  const growTime = ns.formulas.hacking.growTime(target, player);
-  const weakenTime = ns.formulas.hacking.weakenTime(target, player);
-
-  if (weakenTime < growTime || weakenTime < hackTime)
-    ns.tprint("Weaken time isn't the slowest... this script won't work") && ns.exit();
-
-  //                    |= hack ====================|
-  // |=weaken 1======================================|
-  //                |= grow ==========================|
-  //   |=weaken 2======================================|
-
-  // These should be the sleeps necessary for scripts to start at the right time.
-  // Tweak padTime to spread them out some more.
-  // They start at "0", so scripts will have to sleep some additional time based on batch go time.
-  const hackStartTime = weakenTime - hackTime - PadTime;
-  const hackWeakenStartTime = 0;
-  const growStartTime = weakenTime - growTime + PadTime;
-  const growWeakenStartTime = PadTime * 2;
-
-  // This is how much % a single thread will steal from the server.
-  const hackPercent = ns.formulas.hacking.hackPercent(target, player);
-
-  // Threads necessary to steal at most N% of the money
-  const hackThreads = Math.floor((percent / 100) / hackPercent);
-
-  // Actual percent hacked with that many threads (not exactly 50%)
-  const percentHacked = hackPercent * hackThreads;
-
-  // Use this to calculate how many threads to use to return money to 100%
-  let serverBeforeGrow = { ...target };
-  serverBeforeGrow.moneyAvailable = target.moneyMax - (target.moneyMax * percentHacked);
-  const growThreads = Math.ceil(
-    ns.formulas.hacking.growThreads(serverBeforeGrow, player, target.moneyMax) * 1.2
-  );
-
-  // From the hack() docs:
-  // A successful `hack()` on a server will raise that server’s security level by 0.002.
-  const hackSecurityIncreasePerThread = 0.002;
-  // Had to look this up in the source code...
-  const growSecurityIncreasePerThread = 0.004;
-
-  let hackSecurityIncrease = hackThreads * hackSecurityIncreasePerThread;
-  let growSecurityIncrease = growThreads * growSecurityIncreasePerThread;
-
-  // This is documented in the weaken() method.
-  const weakenPerThread = 0.05;
-  const hackWeakenThreads = Math.ceil((hackSecurityIncrease / weakenPerThread) * 1.2);
-  const growWeakenThreads = Math.ceil((growSecurityIncrease / weakenPerThread) * 1.2);
-
-  // Assume a cycle will last the weakenTime (known slowest).
-  const cycleTime = weakenTime;
-
-  return {
-    hackThreads,
-    hackWeakenThreads,
-    growThreads,
-    growWeakenThreads,
-    hackStartTime,
-    hackWeakenStartTime,
-    growStartTime,
-    growWeakenStartTime,
-    cycleTime,
-    percent,
-  }
-}
-
-/** @param {NS} ns */
 async function boot(ns, server, parameters, target, slot) {
-  ns.printf("[%s] %s: booting processes", slot, server.hostname)
+  ns.printf("[%s] %s: booting processes", slot, server.hostname);
 
   // Shut down previous version of hack if running and copy new hacks
   ns.scriptKill("hack.js", server.hostname);
@@ -186,10 +142,42 @@ async function boot(ns, server, parameters, target, slot) {
   pkill(ns, "hack-weaken.js", server.hostname, target.hostname);
   pkill(ns, "hack-hack.js", server.hostname, target.hostname);
 
-  ns.exec("hack-hack.js", server.hostname, parameters.hackThreads, target.hostname, parameters.hackStartTime, parameters.cycleTime, slot);
-  ns.exec("hack-weaken.js", server.hostname, parameters.hackWeakenThreads, target.hostname, parameters.hackWeakenStartTime, parameters.cycleTime, slot);
-  ns.exec("hack-grow.js", server.hostname, parameters.growThreads, target.hostname, parameters.growStartTime, parameters.cycleTime, slot);
-  ns.exec("hack-weaken.js", server.hostname, parameters.growWeakenThreads, target.hostname, parameters.growWeakenStartTime, parameters.cycleTime, slot);
+  ns.exec(
+    "hack-hack.js",
+    server.hostname,
+    parameters.hackThreads,
+    target.hostname,
+    slot,
+    parameters.hackStartTime,
+    parameters.cycleTime,
+  );
+  ns.exec(
+    "hack-weaken.js",
+    server.hostname,
+    parameters.hackWeakenThreads,
+    target.hostname,
+    slot,
+    parameters.hackWeakenStartTime,
+    parameters.cycleTime,
+  );
+  ns.exec(
+    "hack-grow.js",
+    server.hostname,
+    parameters.growThreads,
+    target.hostname,
+    slot,
+    parameters.growStartTime,
+    parameters.cycleTime,
+  );
+  ns.exec(
+    "hack-weaken.js",
+    server.hostname,
+    parameters.growWeakenThreads,
+    target.hostname,
+    slot,
+    parameters.growWeakenStartTime,
+    parameters.cycleTime,
+  );
 }
 
 /** @param {NS} ns */

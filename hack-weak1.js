@@ -5,9 +5,10 @@ export async function main(ns) {
   let target = ns.args[0];
 
   if (ns.args.length >= 2) {
-    await waiter(ns, ns.args, "weak", async function (ns) {
-      await ns.weaken(target);
-    });
+    await waiter(
+      ns, ns.args, "weak",
+      async function (ns) { await ns.weaken(target) }
+    );
   } else {
     while (true) {
       await ns.weaken(target);
