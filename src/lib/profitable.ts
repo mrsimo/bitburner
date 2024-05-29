@@ -1,0 +1,40 @@
+import { NS, Server } from "@ns";
+
+import { getKnownServers } from "lib/explore";
+import { isHackable } from "lib/hackable";
+import { toMoney } from "lib/money.js";
+
+export async function main(ns: NS): Promise<void> {
+  const topServers = topProfitableServers(ns, 10, ns.getHackingLevel() * 0.5);
+  ns.tprintf("Most profitable severs:");
+  topServers.forEach((server) =>
+    ns.tprintf(
+      "%s: %s, %s hack level, %s security level",
+      server.hostname,
+      toMoney(Number(server.moneyMax)),
+      server.hackDifficulty?.toFixed(2),
+      server.minDifficulty?.toFixed(2),
+    ),
+  );
+}
+
+export function profitableServer(ns: NS): Server {
+  return topProfitableServers(ns, 1, ns.getHackingLevel() * 0.5)[0];
+}
+
+/** @param {NS} ns */
+export function topProfitableServers(ns: NS, amount: number, maxHackLevel: number): Server[] {
+  const knownHostnames = getKnownServers(ns);
+  const myHackLevel = ns.getHackingLevel();
+
+  return knownHostnames
+    .filter(
+      (hostname) =>
+        hostname != "home" &&
+        isHackable(ns, hostname) &&
+        ns.getServerRequiredHackingLevel(hostname) <= maxHackLevel,
+    )
+    .map((hostname) => ns.getServer(hostname))
+    .sort((a, b) => Number(b.moneyMax) - Number(a.moneyMax))
+    .slice(0, amount);
+}
