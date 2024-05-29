@@ -1,13 +1,28 @@
-/**
- * So we can use ns directly everywhere in the file.
- * @type {NS}
- **/
-let ns;
+import { NS } from '@ns';
+
+interface Owner {
+  ns: NS;
+  servers: Ser[];
+  home: Ser;
+  state?: Object;
+  ensures: Ensure[],
+  pids: number[];
+}
+
+class Ensure {
+  script: string;
+  threads: number;
+  home: boolean;
+  args: any[];
+  compareArgs: any[];
+}
 
 export default class Manager {
+  ns: NS;
+  owner: Owner,
+
   constructor(owner, state = null) {
-    ns = owner.ns;
-    this.ns = owner.ns;
+          this.ns = owner.ns;
     this.owner = owner;
     this.state = state;
     this.ensures = [];
@@ -85,7 +100,7 @@ export default class Manager {
       const scriptMemory = ns.getScriptRam(script);
       const sortedServers = servers.sort((a, b) => a.availableMemory - b.availableMemory);
 
-      for (let i in sortedServers) {
+      for (const i in sortedServers) {
         const server = sortedServers[i];
         const canRun = Math.floor(server.availableMemory / scriptMemory);
         if (canRun > threads) {
