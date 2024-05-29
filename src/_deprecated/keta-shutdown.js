@@ -1,12 +1,12 @@
-import { getRunnableServers } from "lib/explore.js"
-import { profitableServer } from "lib/profitable.js"
+import { getRunnableServers } from "lib/explore.js";
+import { profitableServer } from "lib/profitable.js";
 import { pkill } from "lib/kill.js";
 
 /** @param {NS} ns */
 export async function main(ns) {
-  let ts = ns.args.length >= 1 ? ns.args[0] : (await profitableServer(ns)).server;
+  let ts = ns.args.length >= 1 ? ns.args[0] : profitableServer(ns).server;
   let restart = ns.args.length >= 2 ? ns.args[1] == "please" : false;
-  
+
   const runnableServers = await getRunnableServers(ns);
 
   ns.printf("Doing a clean shutdown");
@@ -44,6 +44,6 @@ export async function main(ns) {
 
   // I was told to start the process again. Likely by the watchdog.
   if (restart) {
-    ns.spawn("keta-hack.js", 1, ts, "please")
+    ns.spawn("keta-hack.js", 1, ts, "please");
   }
 }

@@ -4,8 +4,6 @@ import Manager from "lib/manager.js";
 import Watchdog from "lib/watchdog.js";
 import { ketaParameters } from "lib/keta.js";
 
-import * as Helpers from "lib/helpers.js";
-
 /**
  * So we can use ns directly everywhere in the file.
  * @type {NS}

@@ -1,49 +1,49 @@
-import { getRunnableServers } from "lib/explore.js";
-import { isHackable } from "lib/hackable.js";
-import { profitableServer } from "lib/profitable.js";
-import { h4ck } from "lib/break.js";
+import { NS } from "@ns";
 
-/** @param {NS} ns */
-export async function main(ns) {
-  let mostProfitableServer;
-  if (ns.args.length >= 1) {
-    mostProfitableServer = ns.args[0];
-  } else {
-    mostProfitableServer = (await profitableServer(ns)).server;
-  }
+import { getRunnableServers } from "lib/explore";
+import { profitableServer } from "lib/profitable";
+import { h4ck } from "lib/break";
 
+interface NumberDictionary {
+  [index: string]: number;
+}
+
+interface NumberNumberDictionary {
+  [index: string]: NumberDictionary;
+}
+
+export async function main(ns: NS): Promise<void> {
+  const target = ns.args.length >= 1 ? ns.getServer(String(ns.args[0])) : profitableServer(ns);
   let useHome = true;
   if (ns.args.length >= 2) {
-    useHome = !(ns.args[1] == "dont");
+    useHome = !(String(ns.args[1]) == "dont");
   }
 
-  ns.tprint("Going to bootstrap against " + mostProfitableServer);
+  ns.tprintf("Going to bootstrap against %s", target.hostname);
 
-  const runnableServers = await getRunnableServers(ns);
+  const runnableServers = getRunnableServers(ns);
 
   // First make sure we've broken the servers as far as we can
-  for (var i = 0; i < runnableServers.length; i++) {
-    await h4ck(ns, runnableServers[i]);
-  }
-  await h4ck(ns, mostProfitableServer);
+  h4ck(ns, target.hostname);
+  runnableServers.forEach((server) => h4ck(ns, server));
 
   useHome && runnableServers.push("home");
 
   // We count how many threads in total can we run in our network
   const { totalThreads, threadsPerServer } = calculateThreads(ns, runnableServers);
 
-  const threadMultipliers = { grow: 20, weaken: 4, hack: 1 };
+  const threadMultipliers = { grow: 25, weaken: 4, hack: 1 };
 
   const totalGroups = Math.floor(
     totalThreads / (threadMultipliers.grow + threadMultipliers.weaken + threadMultipliers.hack),
   );
-  const needs = {
+  const needs: NumberDictionary = {
     grow: totalGroups * threadMultipliers.grow,
     weaken: totalGroups * threadMultipliers.weaken,
     hack: totalGroups * threadMultipliers.hack,
   };
-  const haves = { grow: 0, weaken: 0, hack: 0 };
-  let toRun = {};
+  const haves: NumberDictionary = { grow: 0, weaken: 0, hack: 0 };
+  let toRun: NumberNumberDictionary = {};
 
   ns.tprintf("It should mean that we can run up to %s groups of threads", totalGroups);
 
@@ -52,8 +52,7 @@ export async function main(ns) {
   // what's necessary. Since we would only be growing, there shouldn't be a situation where we need to kill stuff,
   // unless we're changing the multipliers.
 
-  for (var i = 0; i < runnableServers.length; i++) {
-    const server = runnableServers[i];
+  runnableServers.forEach((server) => {
     let availableThreads = threadsPerServer[server];
     toRun[server] = { grow: 0, weaken: 0, hack: 0 };
 
@@ -67,19 +66,17 @@ export async function main(ns) {
         haves[action] = haves[action] + canRun;
       }
     }
-  }
+  });
 
   for (const server in toRun) {
     // Shut down previous version of hack if running and copy new hacks
-    ns.scriptKill("hack.js", server);
-    ns.rm("hack.js", server);
-    ns.scp(["hack-grow.js", "hack-weaken.js", "hack-hack.js", "lib/wait.js"], server);
+    ns.scp(["lsd/grow.js", "lsd/weaken.js", "lsd/hack.js"], server);
 
     // First loop to shut down undesired processes so we can free memory
     let processes = ns.ps(server);
     for (const action in toRun[server]) {
       const threads = toRun[server][action];
-      const script = "hack-" + action + ".js";
+      const script = "lsd/" + action + ".js";
 
       let process;
       for (let i = 0; i < processes.length; i++) {
@@ -87,7 +84,10 @@ export async function main(ns) {
         if (proc.filename == script) process = proc;
       }
 
-      if (process != null && (process.threads != threads || process.args != mostProfitableServer)) {
+      if (
+        process != null &&
+        (process.threads != threads || String(process.args[0]) != target.hostname)
+      ) {
         ns.tprintf("%s/%s: %s vs %s", server, action, threads, process?.threads || 0);
         ns.scriptKill(script, server);
       }
@@ -97,7 +97,7 @@ export async function main(ns) {
     processes = ns.ps(server);
     for (const action in toRun[server]) {
       const threads = toRun[server][action];
-      const script = "hack-" + action + ".js";
+      const script = "lsd/" + action + ".js";
 
       let process;
       for (let i = 0; i < processes.length; i++) {
@@ -107,19 +107,22 @@ export async function main(ns) {
 
       if (process == null && threads > 0) {
         ns.tprintf("%s/%s: booting %s", server, action, threads);
-        ns.exec(script, server, threads, mostProfitableServer);
+        ns.exec(script, server, threads, target.hostname);
       }
     }
   }
 }
 
 /** @param {NS} ns */
-function calculateThreads(ns, runnableServers) {
+function calculateThreads(
+  ns: NS,
+  runnableServers: string[],
+): { threadsPerServer: NumberDictionary; totalThreads: number } {
   const scriptMemory = maxScriptMemory(ns);
-  ns.tprintf("Seems like each script will need %sG", scriptMemory);
+  ns.tprintf("Seems like each script will need %s", ns.formatRam(scriptMemory));
 
   let totalThreads = 0;
-  let threadsPerServer = {};
+  let threadsPerServer: NumberDictionary = {};
 
   for (var i = 0; i < runnableServers.length; i++) {
     const server = runnableServers[i];
@@ -139,10 +142,10 @@ function calculateThreads(ns, runnableServers) {
 }
 
 /** @param {NS} ns */
-function maxScriptMemory(ns) {
-  let growScriptMemory = ns.getScriptRam("hack-grow.js");
-  let weakenScriptMemory = ns.getScriptRam("hack-weaken.js");
-  let hackScriptMemory = ns.getScriptRam("hack-hack.js");
+function maxScriptMemory(ns: NS) {
+  let growScriptMemory = ns.getScriptRam("lsd/grow.js");
+  let weakenScriptMemory = ns.getScriptRam("lsd/weaken.js");
+  let hackScriptMemory = ns.getScriptRam("lsd/hack.js");
 
   return Math.max(growScriptMemory, weakenScriptMemory, hackScriptMemory);
 }

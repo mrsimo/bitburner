@@ -1,18 +1,18 @@
+import { NS } from "@ns";
 import { toMoney } from "lib/money.js";
 
-/** @param {NS} ns */
-export async function main(ns) {
-  let target = ns.args[0];
+export async function main(ns: NS): Promise<void> {
+  const target = String(ns.args[0]);
 
   ns.tprint("Server: " + target);
   ns.tprint(
     "Security: " + ns.getServerMinSecurityLevel(target) + "/" + ns.getServerSecurityLevel(target),
   );
 
-  let moneyRaw = ns.getServerMoneyAvailable(target);
-  let moneyDollars = toMoney(moneyRaw);
-  let moneyMaxRaw = ns.getServerMaxMoney(target);
-  let moneyMaxDollars = toMoney(moneyMaxRaw);
+  const moneyRaw = ns.getServerMoneyAvailable(target);
+  const moneyDollars = toMoney(moneyRaw);
+  const moneyMaxRaw = ns.getServerMaxMoney(target);
+  const moneyMaxDollars = toMoney(moneyMaxRaw);
   if (ns.getServerMaxMoney(target) != 0) {
     ns.tprint(
       "Money: " +
@@ -27,7 +27,7 @@ export async function main(ns) {
     ns.tprint("Money: " + moneyDollars);
   }
 
-  let server = ns.getServer(target);
+  const server = ns.getServer(target);
 
   ns.tprintf("Memory: %s/%s ", ns.formatRam(server.ramUsed), ns.formatRam(server.maxRam));
   ns.tprintf("Cores: %s", server.cpuCores);

@@ -1,5 +1,6 @@
-/** @param {NS} ns */
-export function h4ck(ns, target) {
+import { NS } from "@ns";
+
+export function h4ck(ns: NS, target: string) {
   if (!ns.hasRootAccess(target)) {
     ns.fileExists("BruteSSH.exe") && ns.brutessh(target);
     ns.fileExists("FTPCrack.exe") && ns.ftpcrack(target);

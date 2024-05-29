@@ -1,23 +1,72 @@
-// Tweak to spread a script finish times more or less.
-const PadTime = 300;
+import { NS } from "@ns";
+import Ser from "lib/ser";
+
+class KetaParameters {
+  hackThreads: number;
+  hackWeakenThreads: number;
+  growThreads: number;
+  growWeakenThreads: number;
+  hackStartTime: number;
+  hackWeakenStartTime: number;
+  growStartTime: number;
+  growWeakenStartTime: number;
+  cycleTime: number;
+  percent: number;
+  memoryPerSlot: number;
+
+  constructor(
+    hackThreads: number,
+    hackWeakenThreads: number,
+    growThreads: number,
+    growWeakenThreads: number,
+    hackStartTime: number,
+    hackWeakenStartTime: number,
+    growStartTime: number,
+    growWeakenStartTime: number,
+    cycleTime: number,
+    percent: number,
+    memoryPerSlot: number,
+  ) {
+    this.hackThreads = hackThreads;
+    this.hackWeakenThreads = hackWeakenThreads;
+    this.growThreads = growThreads;
+    this.growWeakenThreads = growWeakenThreads;
+    this.hackStartTime = hackStartTime;
+    this.hackWeakenStartTime = hackWeakenStartTime;
+    this.growStartTime = growStartTime;
+    this.growWeakenStartTime = growWeakenStartTime;
+    this.cycleTime = cycleTime;
+    this.percent = percent;
+    this.memoryPerSlot = memoryPerSlot;
+  }
+}
 
 /**
  * @param {NS} ns
  * @param {Ser} target
  * @returns parameters for the keta hack scripts
  */
-export function ketaParameters(ns, target) {
-  const player = ns.getPlayer();
-
-  return parametersForPercent(ns, 100, player, target.server);
+export function ketaParameters(ns: NS, target: Ser, padTime: number): KetaParameters {
+  return parametersForPercent(ns, 100, target, padTime);
 }
 
 /** @param {NS} ns */
-export function parametersForPercent(ns, percent, player, target) {
+export function parametersForPercent(
+  ns: NS,
+  percent: number,
+  target: Ser,
+  padTime: number,
+): KetaParameters {
+  if (!target.server.moneyMax) {
+    ns.tprint("This server doesn't have the moneyMax attribute... this script won't work");
+    ns.exit();
+  }
+  const player = ns.getPlayer();
+
   // We should do all the calculations against a primed server. Otherwise we
   // might be running it against a server that is halfway through being hacked
   // and the numbers will keep changing.
-  let serverPrimed = { ...target };
+  let serverPrimed = { ...target.server };
   serverPrimed.moneyAvailable = target.moneyMax;
   serverPrimed.hackDifficulty = target.minDifficulty;
 
@@ -27,8 +76,10 @@ export function parametersForPercent(ns, percent, player, target) {
   const growTime = ns.formulas.hacking.growTime(serverPrimed, player);
   const weakenTime = ns.formulas.hacking.weakenTime(serverPrimed, player);
 
-  if (weakenTime < growTime || weakenTime < hackTime)
-    ns.tprint("Weaken time isn't the slowest... this script won't work") && ns.exit();
+  if (weakenTime < growTime || weakenTime < hackTime) {
+    ns.tprint("Weaken time isn't the slowest... this script won't work");
+    ns.exit();
+  }
 
   //                    |= hack ====================|
   // |=weaken 1======================================|
@@ -37,10 +88,10 @@ export function parametersForPercent(ns, percent, player, target) {
 
   // These should be the sleeps necessary for scripts to start at the right time.
   // Tweak padTime to spread them out some more.
-  const hackStartTime = weakenTime - hackTime - PadTime;
+  const hackStartTime = weakenTime - hackTime - padTime;
   const hackWeakenStartTime = 0;
-  const growStartTime = weakenTime - growTime + PadTime;
-  const growWeakenStartTime = PadTime * 2;
+  const growStartTime = weakenTime - growTime + padTime;
+  const growWeakenStartTime = padTime * 2;
 
   // This is how much % a single thread will steal from the server.
   const hackPercent = ns.formulas.hacking.hackPercent(serverPrimed, player);
@@ -54,13 +105,14 @@ export function parametersForPercent(ns, percent, player, target) {
   // Use this to calculate how many threads to use to return money to 100%
   // The growThreads method depends on a Server object, so we modify the current
   // one to the supposed status.
-  let serverBeforeGrow = { ...target };
-  serverBeforeGrow.moneyAvailable = target.moneyMax - target.moneyMax * percentHacked;
+  let serverBeforeGrow = { ...target.server };
+  const moneyMax = Number(target.moneyMax);
+  serverBeforeGrow.moneyAvailable = moneyMax - moneyMax * percentHacked;
 
   // We add 10% more threads... just in case. But shouldn't be necessary. It's mostly
   // in case it helps the period last a bit longer when user increaes Hacking skill.
   const growThreads = Math.ceil(
-    ns.formulas.hacking.growThreads(serverBeforeGrow, player, target.moneyMax),
+    ns.formulas.hacking.growThreads(serverBeforeGrow, player, moneyMax),
   );
 
   // From the hack() docs:

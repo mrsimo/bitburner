@@ -1,37 +1,54 @@
-import { NS } from '@ns';
+import { NS, ProcessInfo, ScriptArg } from "@ns";
+import Ser from "lib/ser";
 
 interface Owner {
   ns: NS;
   servers: Ser[];
   home: Ser;
-  state?: Object;
-  ensures: Ensure[],
-  pids: number[];
 }
 
-class Ensure {
+class Demand {
   script: string;
   threads: number;
   home: boolean;
-  args: any[];
-  compareArgs: any[];
+  args?: string[] | ScriptArg[];
+  compareArgs?: string[] | ScriptArg[];
+
+  constructor(
+    script: string,
+    threads: number,
+    home = false,
+    args?: string[] | ScriptArg[],
+    compareArgs?: string[] | ScriptArg[],
+  ) {
+    this.script = script;
+    this.threads = threads;
+    this.home = home;
+    this.args = args;
+    this.compareArgs = compareArgs;
+  }
 }
 
 export default class Manager {
   ns: NS;
-  owner: Owner,
+  owner: Owner;
+  state?: Object;
+  demands: Demand[];
+  pids: number[];
+  doneCallback?: Function;
+  doneCondition?: Function;
 
-  constructor(owner, state = null) {
-          this.ns = owner.ns;
+  constructor(owner: Owner, state?: Object) {
+    this.ns = owner.ns;
     this.owner = owner;
     this.state = state;
-    this.ensures = [];
+    this.demands = [];
     this.pids = [];
   }
 
   run() {
     if (!this.doneCondition || !this.doneCondition(this.state)) {
-      this.runEnsures();
+      this.runDemands();
     }
 
     if (this.doneCondition && this.doneCallback) {
@@ -39,75 +56,96 @@ export default class Manager {
     }
   }
 
-  runEnsures() {
-    this.ensures.forEach((conditions) => this.actuallyEnsure(...conditions));
+  runDemands() {
+    this.demands.forEach((demand) => this.actuallyEnsure(demand));
   }
 
-  ensure(script, threads, home = true, args = [], compareArgs = null) {
-    this.ensures.push([script, threads, home, args, compareArgs ? compareArgs : args]);
+  ensure(
+    script: string,
+    threads: number,
+    home?: boolean,
+    args?: string[] | ScriptArg[],
+    compareArgs?: string[] | ScriptArg[],
+  ) {
+    this.demands.push(new Demand(script, threads, home, args, compareArgs ? compareArgs : args));
     return this;
   }
 
   /**
-   * Makes sure a certain amount of threads of a script is running accross our servers. Kills and starts new ones as necessary.
+   * Runs the ensure given and
    *
-   * @param script - Name of the script to run
-   * @param threads - Amount of threads to run
-   * @param args - Arguments to compare against
-   * @param compareArgs - Arguments to compare against
+   * @param {Demand} options
    */
-  actuallyEnsure(script, threads, home, args, compareArgs) {
-    const servers = home ? [this.owner.home] : this.owner.servers;
+  actuallyEnsure(demand: Demand) {
+    const servers = demand.home ? [this.owner.home] : this.owner.servers;
 
-    if (!home) {
+    if (!demand.home) {
       // Copy the script everywhere
       servers.forEach((server) => {
-        ns.scp(script, server.hostname);
+        this.ns.scp(demand.script, server.hostname);
       });
     }
 
     // Find if it's running already
     const processes = servers.flatMap((server) => {
       return server.procs.filter(
-        (proc) => proc.filename == script && this.sameArgs(compareArgs, proc.args),
+        (proc: ProcessInfo) =>
+          proc.filename == demand.script && this.sameArgs(demand.compareArgs, proc.args),
       );
     });
 
-    if (threads > 0 && processes.length == 1 && processes[0].threads == threads) {
+    if (demand.threads > 0 && processes.length == 1 && processes[0].threads == demand.threads) {
       return;
-    } else if (threads == 0) {
+    } else if (demand.threads == 0) {
       if (processes.length >= 1) {
-        ns.tprintf(
+        this.ns.tprintf(
           "'%s' home=%s with %s args stopping %s processes",
-          script,
-          home,
-          JSON.stringify(args),
+          demand.script,
+          demand.home,
+          JSON.stringify(demand.args),
           processes.length,
         );
-        processes.forEach((proc) => ns.kill(proc.pid));
+        processes.forEach((proc) => this.ns.kill(proc.pid));
       }
       return;
     } else {
-      processes.forEach((proc) => ns.kill(proc.pid));
-      ns.tprintf(
+      processes.forEach((proc) => this.ns.kill(proc.pid));
+      this.ns.tprintf(
         "'%s' home=%s with %s args should run %s threads, booting",
-        script,
-        home,
-        JSON.stringify(args),
-        threads,
+        demand.script,
+        demand.home,
+        JSON.stringify(demand.args),
+        demand.threads,
       );
 
-      const scriptMemory = ns.getScriptRam(script);
+      const scriptMemory = this.ns.getScriptRam(demand.script);
       const sortedServers = servers.sort((a, b) => a.availableMemory - b.availableMemory);
 
       for (const i in sortedServers) {
         const server = sortedServers[i];
         const canRun = Math.floor(server.availableMemory / scriptMemory);
-        if (canRun > threads) {
-          ns.exec(script, server.hostname, threads, ...args);
+        if (canRun > demand.threads) {
+          this.pids.push(
+            this.ns.exec(demand.script, server.hostname, demand.threads, ...(<[]>demand.args)),
+          );
           return;
         }
       }
+    }
+  }
+
+  /**
+   * Waits for all the booted processes to finish
+   */
+  async wait(): Promise<void> {
+    while (true) {
+      this.pids = this.pids.filter((pid) => this.ns.isRunning(pid));
+
+      if (this.pids.length == 0) {
+        return;
+      }
+
+      await this.ns.sleep(1000);
     }
   }
 
@@ -118,14 +156,12 @@ export default class Manager {
    * @param args - args to compare from
    * @param procArgs - args to compare to
    */
-  sameArgs(args, procArgs) {
-    if ((args == null || args.length == 0) && (procArgs == null || procArgs.length == 0)) {
-      return true;
-    }
-
-    for (let i = 0; i < args.length; i++) {
-      if (args[i] != procArgs[i]) {
-        return false;
+  sameArgs(args?: string[] | ScriptArg[], procArgs?: string[] | ScriptArg[]) {
+    if (args && procArgs) {
+      for (let i = 0; i < args.length; i++) {
+        if (args[i] != procArgs[i]) {
+          return false;
+        }
       }
     }
 

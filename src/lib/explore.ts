@@ -1,8 +1,8 @@
-import { isHackable } from "lib/hackable.js";
-import { h4ck } from "lib/break.js";
+import { NS } from "@ns";
+import { isHackable } from "/lib/hackable.js";
+import { h4ck } from "/lib/break";
 
-/** @param {NS} ns */
-export function main(ns) {
+export async function main(ns: NS): Promise<void> {
   let servers = getKnownServers(ns);
 
   ns.tprintf("Found %s servers:", servers.length);
@@ -12,15 +12,13 @@ export function main(ns) {
   });
 }
 
-/** @param {NS} ns */
-export function getKnownServers(ns) {
+export function getKnownServers(ns: NS): string[] {
   let knownServers = ["home"];
   explore(ns, "home", knownServers);
   return knownServers.sort();
 }
 
-/** @param {NS} ns */
-export function getRunnableServers(ns, home = true) {
+export function getRunnableServers(ns: NS, home = true): string[] {
   let knownServers = getKnownServers(ns);
 
   let runnableServers = [];
@@ -40,10 +38,7 @@ export function getRunnableServers(ns, home = true) {
   }
 }
 
-/**
- * @param {NS} ns
- * */
-function explore(ns, server, knownServers) {
+function explore(ns: NS, server: string, knownServers: string[]) {
   let reachableServers = ns.scan(server);
 
   for (var i = 0; i < reachableServers.length; i++) {

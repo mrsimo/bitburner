@@ -1,14 +1,18 @@
-import { toMoney } from "lib/money.js";
+import { toMoney } from "/lib/money";
 
 /** @param {NS} ns */
-export async function main(ns) {
+export async function main(ns: NS): Promise<void> {
   ns.disableLog("getServerMinSecurityLevel");
   ns.disableLog("getServerSecurityLevel");
   ns.disableLog("getServerMoneyAvailable");
   ns.disableLog("getServerMaxMoney");
   ns.disableLog("sleep");
-  
-  let target = ns.args[0];
+  ns.clearLog();
+
+  ns.resizeTail(1050, 60);
+  ns.moveTail(300, 0);
+
+  let target = String(ns.args[0]);
 
   let toTerminal = false;
   if (ns.args.length > 1 && ns.args[1] == "please") {
@@ -31,22 +35,26 @@ export async function main(ns) {
 
       let allGood;
       if (currentSecurity == minSecurity && currentMoney == maxMoney) {
-        allGood = "✔"
+        allGood = "✔";
       } else {
-        allGood = " "
+        allGood = " ";
       }
 
       let printFunc = toTerminal ? ns.tprintf : ns.printf;
       printFunc(
         "%s - %s [%s] - Security: %s/%s (+%s), Money: %s/%s (%s)",
         new Date().toISOString(),
-        target, 
+        target,
         allGood,
-        currentSecurity.toFixed(2),  minSecurity.toFixed(2), (currentSecurity - minSecurity).toFixed(2),
-        toMoney(currentMoney), toMoney(maxMoney), (currentMoney / maxMoney * 100).toFixed(2) + "%"
+        currentSecurity.toFixed(2),
+        minSecurity.toFixed(2),
+        (currentSecurity - minSecurity).toFixed(2),
+        toMoney(currentMoney),
+        toMoney(maxMoney),
+        ((currentMoney / maxMoney) * 100).toFixed(2) + "%",
       );
     }
 
-    await ns.sleep(100)
+    await ns.sleep(100);
   }
 }

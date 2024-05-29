@@ -1,4 +1,4 @@
-import { ProcessInfo, Server } from "@ns";
+import { NS, ProcessInfo, Server } from "@ns";
 
 export default class Ser {
   ns: NS;
