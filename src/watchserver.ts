@@ -9,7 +9,7 @@ export async function main(ns: NS): Promise<void> {
   ns.disableLog("sleep");
   ns.clearLog();
 
-  ns.resizeTail(1050, 60);
+  ns.resizeTail(1100, 60);
   ns.moveTail(300, 0);
 
   let target = String(ns.args[0]);

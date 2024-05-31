@@ -1,7 +1,7 @@
 import { NS } from "@ns";
 import Ser from "lib/ser";
 
-class KetaParameters {
+export class KetaParameters {
   hackThreads: number;
   hackWeakenThreads: number;
   growThreads: number;
@@ -112,7 +112,7 @@ export function parametersForPercent(
   // We add 10% more threads... just in case. But shouldn't be necessary. It's mostly
   // in case it helps the period last a bit longer when user increaes Hacking skill.
   const growThreads = Math.ceil(
-    ns.formulas.hacking.growThreads(serverBeforeGrow, player, moneyMax),
+    ns.formulas.hacking.growThreads(serverBeforeGrow, player, moneyMax) * 1.1,
   );
 
   // From the hack() docs:
@@ -126,8 +126,8 @@ export function parametersForPercent(
 
   // This is documented in the weaken() method.
   const weakenPerThread = 0.05;
-  const hackWeakenThreads = Math.ceil(hackSecurityIncrease / weakenPerThread);
-  const growWeakenThreads = Math.ceil(growSecurityIncrease / weakenPerThread);
+  const hackWeakenThreads = Math.ceil((hackSecurityIncrease / weakenPerThread) * 1.1);
+  const growWeakenThreads = Math.ceil((growSecurityIncrease / weakenPerThread) * 1.1);
 
   // Assume a cycle will last the weakenTime (known slowest).
   // We round it up to the closest second.

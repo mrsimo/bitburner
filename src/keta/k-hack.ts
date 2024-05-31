@@ -5,4 +5,5 @@ export async function main(ns: NS): Promise<void> {
   const sleep = Number(ns.args[1]);
 
   await ns.hack(target, { additionalMsec: sleep });
+  // ns.tprintf("[%s/%s]: [✔] hack", target, ns.args[2]);
 }

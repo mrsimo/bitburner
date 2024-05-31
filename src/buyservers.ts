@@ -16,7 +16,7 @@ export async function main(ns: NS): Promise<void> {
       ns.tprint("A new server costs: " + cost);
       ns.tprint("Buying a server  for $" + cost);
 
-      const server = ns.purchaseServer("local-" + serverCurrent, ram);
+      const server = ns.purchaseServer("local-" + String(serverCurrent).padStart(2, "0"), ram);
 
       if (server != "") {
         serverCurrent++;

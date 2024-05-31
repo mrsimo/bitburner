@@ -14,6 +14,7 @@ interface NumberNumberDictionary {
 
 export async function main(ns: NS): Promise<void> {
   const target = ns.args.length >= 1 ? ns.getServer(String(ns.args[0])) : profitableServer(ns);
+
   let useHome = true;
   if (ns.args.length >= 2) {
     useHome = !(String(ns.args[1]) == "dont");
@@ -128,7 +129,7 @@ function calculateThreads(
     const server = runnableServers[i];
     let availableMemory = ns.getServerMaxRam(server);
     if (server == "home") {
-      ns.getServerMaxRam(server) - ns.getServerUsedRam(server) - 32;
+      availableMemory = ns.getServerMaxRam(server) - ns.getServerUsedRam(server) - 32;
     }
     const threads = Math.floor(availableMemory / scriptMemory);
 

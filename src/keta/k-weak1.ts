@@ -5,4 +5,5 @@ export async function main(ns: NS): Promise<void> {
   const sleep = Number(ns.args[1]);
 
   await ns.weaken(target, { additionalMsec: sleep });
+  // ns.tprintf("[%s/%s]: [✔] weak1", target, ns.args[2]);
 }

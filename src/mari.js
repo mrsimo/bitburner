@@ -2,11 +2,10 @@
 const Risk = 0.6;
 
 // How much are we aiming to spend when buying shares
-const BudgetForPurchases = 10000000000; // 10B
+const BudgetForPurchases = 1000000000; // 10B
 
 // We'll only sell if we make this much profit
 const MinimumProfitToSell = 100000; // 100K
-
 
 import { toMoney } from "lib/money.js";
 
@@ -28,12 +27,19 @@ export async function main(ns) {
         const stockPrice = ns.stock.getPrice(sym);
         const sharesToBuy = Math.min(
           ns.stock.getMaxShares(sym) - sharesLong,
-          Math.floor((BudgetForPurchases - valueOwned) / stockPrice)
+          Math.floor((BudgetForPurchases - valueOwned) / stockPrice),
         );
         const estimate = ns.stock.getPurchaseCost(sym, sharesToBuy, "Long");
 
         if (sharesToBuy > 0) {
-          ns.printf("[%s/%s] Forecast is %s, I'd buy %s shares, would cost %s", cycle, sym, forecast.toFixed(2), sharesToBuy, toMoney(estimate));
+          ns.printf(
+            "[%s/%s] Forecast is %s, I'd buy %s shares, would cost %s",
+            cycle,
+            sym,
+            forecast.toFixed(2),
+            sharesToBuy,
+            toMoney(estimate),
+          );
           ns.stock.buyStock(sym, sharesToBuy);
         }
       } else if (forecast < 0.45) {
@@ -44,7 +50,7 @@ export async function main(ns) {
 
           ns.printf("[%s/%s] Selling now would give us %s profit", cycle, sym, toMoney(profit));
 
-          if ((saleGain - valueOwned) >= MinimumProfitToSell) {
+          if (saleGain - valueOwned >= MinimumProfitToSell) {
             ns.stock.sellStock(sym, sharesLong);
           }
         }

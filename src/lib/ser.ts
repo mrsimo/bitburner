@@ -11,6 +11,11 @@ export default class Ser {
     this.procs = ns.ps(this.hostname);
   }
 
+  reload() {
+    this.server = this.ns.getServer(this.server.hostname);
+    this.procs = this.ns.ps(this.server.hostname);
+  }
+
   // i'm sure there's an easier way to do all these delegates
   get hostname() {
     return this.server.hostname;

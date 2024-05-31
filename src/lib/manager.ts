@@ -8,6 +8,7 @@ interface Owner {
 }
 
 class Demand {
+  ns: NS;
   script: string;
   threads: number;
   home: boolean;
@@ -15,17 +16,23 @@ class Demand {
   compareArgs?: string[] | ScriptArg[];
 
   constructor(
+    ns: NS,
     script: string,
     threads: number,
     home = false,
     args?: string[] | ScriptArg[],
     compareArgs?: string[] | ScriptArg[],
   ) {
+    this.ns = ns;
     this.script = script;
     this.threads = threads;
     this.home = home;
     this.args = args;
     this.compareArgs = compareArgs;
+  }
+
+  memoryRequired() {
+    return this.threads * this.ns.getScriptRam(this.script);
   }
 }
 
@@ -57,7 +64,10 @@ export default class Manager {
   }
 
   runDemands() {
-    this.demands.forEach((demand) => this.actuallyEnsure(demand));
+    this.ns.printf("Running %s demands", this.demands.length);
+    this.demands
+      .sort((a, b) => b.memoryRequired() - a.memoryRequired())
+      .forEach((demand) => this.actuallyEnsure(demand));
   }
 
   ensure(
@@ -67,7 +77,9 @@ export default class Manager {
     args?: string[] | ScriptArg[],
     compareArgs?: string[] | ScriptArg[],
   ) {
-    this.demands.push(new Demand(script, threads, home, args, compareArgs ? compareArgs : args));
+    this.demands.push(
+      new Demand(this.ns, script, threads, home, args, compareArgs ? compareArgs : args),
+    );
     return this;
   }
 
@@ -98,8 +110,8 @@ export default class Manager {
       return;
     } else if (demand.threads == 0) {
       if (processes.length >= 1) {
-        this.ns.tprintf(
-          "'%s' home=%s with %s args stopping %s processes",
+        this.ns.printf(
+          "'%s'\thome=%s with %s args stopping %s processes",
           demand.script,
           demand.home,
           JSON.stringify(demand.args),
@@ -110,14 +122,6 @@ export default class Manager {
       return;
     } else {
       processes.forEach((proc) => this.ns.kill(proc.pid));
-      this.ns.tprintf(
-        "'%s' home=%s with %s args should run %s threads, booting",
-        demand.script,
-        demand.home,
-        JSON.stringify(demand.args),
-        demand.threads,
-      );
-
       const scriptMemory = this.ns.getScriptRam(demand.script);
       const sortedServers = servers.sort((a, b) => a.availableMemory - b.availableMemory);
 
@@ -125,10 +129,17 @@ export default class Manager {
         const server = sortedServers[i];
         const canRun = Math.floor(server.availableMemory / scriptMemory);
         if (canRun > demand.threads) {
+          this.ns.printf(
+            "'%s'\thome=%s with %s args booting in %s",
+            demand.script,
+            demand.home,
+            JSON.stringify(demand.args),
+            server.hostname,
+          );
           this.pids.push(
             this.ns.exec(demand.script, server.hostname, demand.threads, ...(<[]>demand.args)),
           );
-          return;
+          break;
         }
       }
     }

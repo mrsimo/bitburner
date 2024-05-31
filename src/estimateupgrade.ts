@@ -3,8 +3,7 @@ import { toMoney } from "lib/money";
 
 export async function main(ns: NS): Promise<void> {
   let servers = ns.getPurchasedServers();
-
-  let ram = ns.args.length == 0 ? 2 * ns.getServerMaxRam(servers[0]) : 2 ** Number(ns.args[0]);
+  let ram = 2 * ns.getServerMaxRam(servers[0]);
 
   ns.tprintf("Estimating upgrade of servers to " + ns.formatRam(ram));
   let total = 0;
