@@ -35,14 +35,18 @@ export async function main(ns: NS): Promise<void> {
 
   const threadMultipliers = { grow: 25, weaken: 4, hack: 1 };
 
-  const totalGroups = Math.floor(
-    totalThreads / (threadMultipliers.grow + threadMultipliers.weaken + threadMultipliers.hack),
-  );
-  const needs: NumberDictionary = {
-    grow: totalGroups * threadMultipliers.grow,
-    weaken: totalGroups * threadMultipliers.weaken,
-    hack: totalGroups * threadMultipliers.hack,
+  const actualGroups =
+    totalThreads / (threadMultipliers.grow + threadMultipliers.weaken + threadMultipliers.hack);
+  let totalGroups = Math.floor(actualGroups);
+  if (totalGroups < 1) {
+    totalGroups = actualGroups;
+  }
+  let needs: NumberDictionary = {
+    grow: Math.floor(totalGroups * threadMultipliers.grow),
+    weaken: Math.floor(totalGroups * threadMultipliers.weaken),
+    hack: Math.floor(totalGroups * threadMultipliers.hack),
   };
+
   const haves: NumberDictionary = { grow: 0, weaken: 0, hack: 0 };
   let toRun: NumberNumberDictionary = {};
 
@@ -129,7 +133,13 @@ function calculateThreads(
     const server = runnableServers[i];
     let availableMemory = ns.getServerMaxRam(server);
     if (server == "home") {
-      availableMemory = ns.getServerMaxRam(server) - ns.getServerUsedRam(server) - 32;
+      const mr = ns.getServerMaxRam(server);
+      const us = ns.getServerUsedRam(server);
+      if (mr == 32) {
+        availableMemory = mr - us - 16;
+      } else {
+        availableMemory = mr - us - 32;
+      }
     }
     const threads = Math.floor(availableMemory / scriptMemory);
 
