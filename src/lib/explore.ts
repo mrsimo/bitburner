@@ -38,7 +38,7 @@ export function getRunnableServers(ns: NS, home = true): string[] {
   }
 }
 
-function explore(ns: NS, server: string, knownServers: string[]) {
+export function explore(ns: NS, server: string, knownServers: string[]) {
   let reachableServers = ns.scan(server);
 
   for (var i = 0; i < reachableServers.length; i++) {

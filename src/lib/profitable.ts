@@ -5,15 +5,16 @@ import { isHackable } from "lib/hackable";
 import { toMoney } from "lib/money.js";
 
 export async function main(ns: NS): Promise<void> {
-  const topServers = topProfitableServers(ns, 10, ns.getHackingLevel() * 0.5);
+  const topServers = topProfitableServers(ns, 15, ns.getHackingLevel() * 0.5);
   ns.tprintf("Most profitable severs:");
   topServers.forEach((server) =>
     ns.tprintf(
-      "%s: %s, %s hack level, %s security level",
+      "%s: %s, %s hack level, %s/%s security level",
       server.hostname,
       toMoney(Number(server.moneyMax)),
-      server.hackDifficulty?.toFixed(2),
-      server.minDifficulty?.toFixed(2),
+      Math.round(server.requiredHackingSkill || 0),
+      server.hackDifficulty?.toFixed(1),
+      server.minDifficulty?.toFixed(1),
     ),
   );
 }

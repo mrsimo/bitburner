@@ -19,17 +19,19 @@ export async function main(ns: NS): Promise<void> {
 
   if (ns.args.length >= 1 && String(ns.args[0]) == "please") {
     ns.spawn("upgradeservers.js");
+  } else if (ns.args.length >= 1 && String(ns.args[0]) == "better") {
+    ns.spawn("upgradeservers.js", 1, "better");
   }
 }
 
 /** @param {NS} ns */
 export async function upgradeServer(ns: NS, server: string, ram: number) {
-  ns.tprint("Going to upgrade " + server + " to " + ram + "GB");
-
   let cost = ns.getPurchasedServerUpgradeCost(server, ram);
+  ns.tprintf("Going to upgrade %s to %s for %s", server, ns.formatRam(ram), toMoney(cost));
+
   while (true) {
     if (ns.getServerMoneyAvailable("home") >= cost) {
-      ns.tprint("Upgrading server " + server + " for " + toMoney(cost));
+      ns.tprintf("Upgrading %s to %s for %s", server, ns.formatRam(ram), toMoney(cost));
       ns.upgradePurchasedServer(server, ram);
       break;
     } else {

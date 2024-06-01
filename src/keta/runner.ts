@@ -61,17 +61,19 @@ export async function main(ns: NS): Promise<void> {
       ns.exit();
     }
 
+    const maxSlots = Math.floor(parameters.cycleTime / SlotTime) - 1;
     let slots = Math.min(
       Math.floor(totalMemory / parameters.memoryPerSlot), // As many slots as they fit in memory
-      Math.floor(parameters.cycleTime / SlotTime) - 1, // As many slots as they fit in a cycle
+      maxSlots, // As many slots as they fit in a cycle
     );
     const manager = new Manager(owner);
 
     ns.tprintf(
-      "[keta] %s: [%s] running %s slots @ %s each",
+      "[keta] %s: [%s] running %s slots (max %s) @ %s each",
       target.hostname,
       target.isPrimed() ? "✔" : " ",
       slots,
+      maxSlots,
       parameters.percent + "%",
     );
 
