@@ -2,15 +2,15 @@
 const Risk = 0.6;
 
 // How much are we aiming to spend when buying shares
-const BudgetForPurchases = 1000000000; // 10B
+const BudgetForPurchases = 1000 * 1000 * 1000; // 1B
 
 // We'll only sell if we make this much profit
 const MinimumProfitToSell = 100000; // 100K
 
-import { toMoney } from "lib/money.js";
+import { toMoney } from "lib/money";
 
 /** @param {NS} ns */
-export async function main(ns) {
+export async function main(ns: NS) {
   const symbols = ns.stock.getSymbols();
   let cycle = 0;
 
@@ -21,6 +21,17 @@ export async function main(ns) {
       const forecast = ns.stock.getForecast(sym);
       const [sharesLong, avgLongPrice, _a, _b] = ns.stock.getPosition(sym);
       const valueOwned = sharesLong * avgLongPrice;
+
+      // if (sharesLong > 0) {
+      //   ns.printf(
+      //     "[%s/%s] I own %s shares, forecast is %s, selling would give us %s",
+      //     cycle,
+      //     sym,
+      //     sharesLong,
+      //     forecast,
+      //     toMoney(ns.stock.getSaleGain(sym, sharesLong, "Long")),
+      //   );
+      // }
 
       if (forecast >= Risk && valueOwned < BudgetForPurchases) {
         // Forecast is good, let's buy some!
@@ -42,7 +53,7 @@ export async function main(ns) {
           );
           ns.stock.buyStock(sym, sharesToBuy);
         }
-      } else if (forecast < 0.45) {
+      } else if (forecast < 0.49) {
         if (sharesLong > 0) {
           // Next tick might go down. Consider selling if there's profit
           const saleGain = ns.stock.getSaleGain(sym, sharesLong, "Long");
