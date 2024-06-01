@@ -52,9 +52,9 @@ class GangManager {
 
   public handleWorkAssignments(): void {
     // First we figure out the genral guidance we need for next cycle
-    if (this.info.wantedLevel > 25) {
+    if (this.info.wantedPenalty < 0.9) {
       this.setGuidance("lower-wanted");
-    } else if (this.info.wantedLevel < 15) {
+    } else if (this.info.wantedPenalty > 0.95) {
       this.setGuidance("increase-money");
     }
 
