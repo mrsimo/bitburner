@@ -1,4 +1,5 @@
 import { NS } from "@ns";
+import { toMoney } from "/lib/money";
 
 export async function main(ns: NS): Promise<void> {
   const serverLimit = ns.getPurchasedServerLimit();
@@ -11,12 +12,8 @@ export async function main(ns: NS): Promise<void> {
     const currentMoney = ns.getServerMoneyAvailable("home");
 
     if (currentMoney >= cost) {
-      ns.tprint("I currently have this many servers: " + serverCurrent);
-      ns.tprint("I have this money: " + currentMoney);
-      ns.tprint("A new server costs: " + cost);
-      ns.tprint("Buying a server  for $" + cost);
-
       const server = ns.purchaseServer("local-" + String(serverCurrent).padStart(2, "0"), ram);
+      ns.tprintf("[buyservers] Buying %s for %s", server, toMoney(cost));
 
       if (server != "") {
         serverCurrent++;

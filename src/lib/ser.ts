@@ -5,9 +5,9 @@ export default class Ser {
   server: Server;
   procs: ProcessInfo[];
 
-  constructor(ns: NS, hostname: string) {
+  constructor(ns: NS, hostname: string | Server) {
     this.ns = ns;
-    this.server = ns.getServer(hostname);
+    this.server = typeof hostname === "string" ? ns.getServer(hostname) : hostname;
     this.procs = ns.ps(this.hostname);
   }
 

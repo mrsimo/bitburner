@@ -5,7 +5,7 @@ import { isHackable } from "lib/hackable";
 import { toMoney } from "lib/money.js";
 
 export async function main(ns: NS): Promise<void> {
-  const topServers = topProfitableServers(ns, 15, ns.getHackingLevel() * 0.5);
+  const topServers = topProfitableServers(ns, 15, ns.getHackingLevel() * 0.4);
   ns.tprintf("Most profitable severs:");
   topServers.forEach((server) =>
     ns.tprintf(

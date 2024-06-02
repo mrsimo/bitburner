@@ -2,8 +2,11 @@ import { NS } from "@ns";
 import { toMoney } from "lib/money.js";
 
 export async function main(ns: NS): Promise<void> {
+  while (ns.getPurchasedServers().length < ns.getPurchasedServerLimit()) {
+    await ns.sleep(60000);
+  }
   const servers = ns.getPurchasedServers();
-  const ram = 2 * ns.getServerMaxRam(servers[0]);
+  const ram = 2 * servers.map((server) => ns.getServerMaxRam(server)).sort()[0];
 
   ns.tprintf("Upgrading servers to " + ns.formatRam(ram));
 
