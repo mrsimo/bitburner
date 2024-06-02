@@ -1,7 +1,7 @@
 import { NS, GangGenInfo, GangMemberInfo, GangTaskStats } from "@ns";
 import { toMoney } from "lib/money";
 
-const EquipmentCostLimit = 1000 * 1000 * 1000; // 1B
+const EquipmentCostLimit = 1000 * 1000 * 1000 * 10; // 10B
 
 export async function main(ns: NS): Promise<void> {
   await new GangManager(ns).work();
@@ -77,6 +77,13 @@ class GangManager {
       if (member) this.assignTask(member, "Train Hacking");
     }
 
+    // Have at least one person battling at all times
+    // if ((remainingMembers.length = this.members.length - 1)) {
+    //   let member = remainingMembers.shift();
+    //   if (member) this.assignTask(member, "Territory Warfare");
+    // }
+
+    // Everyone else
     this.assignMostNeededTasks(remainingMembers);
   }
 
@@ -87,7 +94,18 @@ class GangManager {
         break;
       default:
       case "increase-money":
-        members.forEach((member) => this.assignBestRespectMakingTask(member));
+        const forMoney = members.length / 2;
+        for (let i = 0; i < members.length; i++) {
+          const member = members[i];
+          if (i < forMoney) {
+            this.assignTask(member, "Money Laundering");
+          } else {
+            this.assignTask(member, "Cyberterrorism");
+          }
+        }
+
+        // members.forEach((member) => this.assignTask(member, "Cyberterrorism"));
+        // members.forEach((member) => this.assignBestRespectMakingTask(member));
         break;
     }
   }
