@@ -12,7 +12,7 @@ function explore(ns: NS, server: string, depth: number, max: number, parent?: st
   const allGood = ser.isPrimed() ? "✔" : " ";
 
   ns.tprintf(
-    "%s ┗ %s [%s] - M: %s/%s | S: %s/%s (+%s) | %s/%s | P: %s",
+    "%s ┗ %s [%s] - M: %s/%s | S: %s/%s (+%s) | %s/%s | P: %s | O: %s",
     "  ".repeat(depth),
     server,
     allGood,
@@ -24,6 +24,7 @@ function explore(ns: NS, server: string, depth: number, max: number, parent?: st
     toMoney(ser.moneyAvailable || 0),
     toMoney(ser.moneyMax || 0),
     ns.getServerNumPortsRequired(server),
+    ser.server.organizationName,
   );
 
   if (depth < max) {

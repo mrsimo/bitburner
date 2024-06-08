@@ -17,28 +17,28 @@ export default class Ser {
   }
 
   // i'm sure there's an easier way to do all these delegates
-  get hostname() {
+  get hostname(): string {
     return this.server.hostname;
   }
-  get maxRam() {
+  get maxRam(): number {
     return this.server.maxRam;
   }
-  get ramUsed() {
+  get ramUsed(): number {
     return this.ns.getServerUsedRam(this.server.hostname);
   }
 
-  get moneyMax() {
-    return this.server.moneyMax;
+  get moneyMax(): number {
+    return this.server.moneyMax || 0;
   }
-  get moneyAvailable() {
-    return this.server.moneyAvailable;
+  get moneyAvailable(): number {
+    return this.server.moneyAvailable || 0;
   }
 
-  get minDifficulty() {
-    return this.server.minDifficulty;
+  get minDifficulty(): number {
+    return this.server.minDifficulty || 0;
   }
-  get hackDifficulty() {
-    return this.server.hackDifficulty;
+  get hackDifficulty(): number {
+    return this.server.hackDifficulty || 0;
   }
 
   threadsToWeaken(points: number) {
@@ -81,7 +81,7 @@ export default class Ser {
 
     // Always leave 32GB of RAM available in home server
     if (this.server.hostname === "home") {
-      m = m - 32;
+      m = m - 16;
     }
 
     return m;

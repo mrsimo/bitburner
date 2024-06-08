@@ -136,9 +136,24 @@ export default class Manager {
             JSON.stringify(demand.args),
             server.hostname,
           );
-          this.pids.push(
-            this.ns.exec(demand.script, server.hostname, demand.threads, ...(<[]>demand.args)),
+          const pid = this.ns.exec(
+            demand.script,
+            server.hostname,
+            demand.threads,
+            ...(<[]>demand.args),
           );
+          if (pid <= 0) {
+            this.ns.tprintf(
+              "Failed to boot %s args=%s threads=%s on %s!",
+              demand.script,
+              JSON.stringify(demand.args),
+              demand.threads,
+              server.hostname,
+            );
+            this.ns.tprintf("Exiting...");
+            this.ns.exit();
+          }
+          this.pids.push(pid);
           break;
         }
       }

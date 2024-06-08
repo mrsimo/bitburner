@@ -3,7 +3,10 @@ import { NS } from "@ns";
 import { getRunnableServers } from "lib/explore";
 import { profitableServer } from "lib/profitable";
 import { h4ck } from "lib/break";
+import { ServerResponse } from "http";
+import Ser from "lib/ser";
 
+const ThreadMultipliers = { grow: 25, weaken: 4, hack: 1 };
 interface NumberDictionary {
   [index: string]: number;
 }
@@ -12,151 +15,160 @@ interface NumberNumberDictionary {
   [index: string]: NumberDictionary;
 }
 
+function sameDictionary(a: NumberDictionary, b: NumberDictionary): boolean {
+  return Object.keys(a).every((key) => a[key] == b[key]);
+}
+
 export async function main(ns: NS): Promise<void> {
-  const target = ns.args.length >= 1 ? ns.getServer(String(ns.args[0])) : profitableServer(ns);
+  ns.disableLog("ALL");
+  ns.enableLog("exec");
 
+  const target =
+    ns.args.length >= 1 ? new Ser(ns, String(ns.args[0])) : new Ser(ns, profitableServer(ns));
   let useHome = true;
-  if (ns.args.length >= 2) {
-    useHome = !(String(ns.args[1]) == "dont");
-  }
 
-  ns.tprintf("Going to bootstrap against %s", target.hostname);
+  const debug = ns.args.length >= 2 ? String(ns.args[1]) == "--debug" : false;
 
-  const runnableServers = getRunnableServers(ns);
+  ns.tprintf("Going to bootstrap against %s using home=%s", target.hostname, useHome);
 
-  // First make sure we've broken the servers as far as we can
-  h4ck(ns, target.hostname);
-  runnableServers.forEach((server) => h4ck(ns, server));
+  let lastKnown: NumberDictionary = {};
+  while (true) {
+    const runnableServers = getRunnableServers(ns, useHome).map((server) => new Ser(ns, server));
+    copyLibs(ns, runnableServers);
 
-  useHome && runnableServers.push("home");
+    // First make sure we've broken the servers as far as we can
+    h4ck(ns, target.hostname);
+    runnableServers.forEach((server) => h4ck(ns, server.hostname));
 
-  // We count how many threads in total can we run in our network
-  const { totalThreads, threadsPerServer } = calculateThreads(ns, runnableServers);
+    // We count how many threads in total can we run in our network
+    const { totalThreads, threadsPerServer } = calculateThreads(ns, runnableServers);
 
-  const threadMultipliers = { grow: 25, weaken: 4, hack: 1 };
+    if (debug) {
+      Object.keys(threadsPerServer).forEach((server) => {
+        ns.tprintf("[lsd] %s: Can run %s threads", server, threadsPerServer[server]);
+      });
+    }
 
-  const actualGroups =
-    totalThreads / (threadMultipliers.grow + threadMultipliers.weaken + threadMultipliers.hack);
-  let totalGroups = Math.floor(actualGroups);
-  if (totalGroups < 1) {
-    totalGroups = actualGroups;
-  }
-  let needs: NumberDictionary = {
-    grow: Math.floor(totalGroups * threadMultipliers.grow),
-    weaken: Math.floor(totalGroups * threadMultipliers.weaken),
-    hack: Math.floor(totalGroups * threadMultipliers.hack),
-  };
+    const threadsPerGroup =
+      ThreadMultipliers.grow + ThreadMultipliers.weaken + ThreadMultipliers.hack;
 
-  const haves: NumberDictionary = { grow: 0, weaken: 0, hack: 0 };
-  let toRun: NumberNumberDictionary = {};
+    const totalGroups = totalThreads / threadsPerGroup;
+    let needs: NumberDictionary = {
+      hack: Math.ceil(totalGroups * ThreadMultipliers.hack),
+      weaken: Math.floor(totalGroups * ThreadMultipliers.weaken),
+      grow: Math.floor(totalGroups * ThreadMultipliers.grow),
+    };
 
-  ns.tprintf("It should mean that we can run up to %s groups of threads", totalGroups);
+    if (!sameDictionary(needs, lastKnown)) {
+      ns.tprintf(
+        "[lsd] %s: Running %s threads accross the cluster (g=%s w=%s h=%s)",
+        target.hostname,
+        needs.grow + needs.weaken + needs.hack,
+        needs.grow,
+        needs.weaken,
+        needs.hack,
+      );
+      lastKnown = { ...needs };
+    }
 
-  // Iterate over servers, ensuring we schedule enough threads in order, for a bit of consistency
-  // TODO it would be better if we don't kill anything and instead... take what is and boot new stuff, killing only
-  // what's necessary. Since we would only be growing, there shouldn't be a situation where we need to kill stuff,
-  // unless we're changing the multipliers.
+    // Populate `haves` with currently running threads accross the cluster
+    const haves: NumberDictionary = { grow: 0, weaken: 0, hack: 0 };
+    runnableServers.forEach((server) => {
+      server.procs.forEach((proc) => {
+        Object.keys(needs).forEach((action) => {
+          if (proc.filename == `lsd/${action}.js`) {
+            if (proc.args[0] == target.hostname) {
+              haves[action] ||= 0;
+              haves[action] += proc.threads;
+            } else {
+              ns.tprintf(
+                "[lsd] %s: detected lsd run agaisnt other server, killing it",
+                target.hostname,
+              );
+              ns.kill(proc.pid);
+            }
+          }
+        });
+      });
+    });
 
-  runnableServers.forEach((server) => {
-    let availableThreads = threadsPerServer[server];
-    toRun[server] = { grow: 0, weaken: 0, hack: 0 };
+    if (debug) {
+      Object.keys(haves).forEach((action) => {
+        ns.tprintf("[lsd] %s: Currently running %s", action, haves[action]);
+      });
+    }
 
     for (const action in needs) {
-      const missing = needs[action] - haves[action];
-
-      if (missing > 0) {
-        let canRun = Math.min(missing, availableThreads);
-        toRun[server][action] = canRun;
-        availableThreads = availableThreads - canRun;
-        haves[action] = haves[action] + canRun;
-      }
-    }
-  });
-
-  for (const server in toRun) {
-    // Shut down previous version of hack if running and copy new hacks
-    ns.scp(["lsd/grow.js", "lsd/weaken.js", "lsd/hack.js"], server);
-
-    // First loop to shut down undesired processes so we can free memory
-    let processes = ns.ps(server);
-    for (const action in toRun[server]) {
-      const threads = toRun[server][action];
-      const script = "lsd/" + action + ".js";
-
-      let process;
-      for (let i = 0; i < processes.length; i++) {
-        let proc = processes[i];
-        if (proc.filename == script) process = proc;
-      }
-
-      if (
-        process != null &&
-        (process.threads != threads || String(process.args[0]) != target.hostname)
-      ) {
-        ns.tprintf("%s/%s: %s vs %s", server, action, threads, process?.threads || 0);
-        ns.scriptKill(script, server);
+      if (haves[action] > needs[action]) {
+        ns.tprint(haves);
+        ns.tprint(needs);
+        ns.tprintf(
+          "[lsd] %s: We need fewer threads of %s: %s vs %s! Giving up!",
+          ac,
+          action,
+          haves[action],
+          needs[action],
+        );
+        ns.exit();
       }
     }
 
-    // Second loop to boot desired processes
-    processes = ns.ps(server);
-    for (const action in toRun[server]) {
-      const threads = toRun[server][action];
-      const script = "lsd/" + action + ".js";
-
-      let process;
-      for (let i = 0; i < processes.length; i++) {
-        let proc = processes[i];
-        if (proc.filename == script) process = proc;
+    // Actually boot stuff
+    runnableServers.forEach((server) => {
+      for (const action in needs) {
+        const script = `lsd/${action}.js`;
+        const missing = needs[action] - haves[action];
+        const canRun = Math.floor(server.availableMemory / ns.getScriptRam(script));
+        if (debug) {
+          ns.tprintf(
+            "[lsd] %s: Missing %s threads of %s, can run %s",
+            server.hostname,
+            missing,
+            action,
+            canRun,
+          );
+        }
+        if (missing > 0 && canRun > 0) {
+          const threads = Math.min(missing, canRun);
+          ns.exec(script, server.hostname, threads, target.hostname);
+          haves[action] += threads;
+        }
       }
+    });
 
-      if (process == null && threads > 0) {
-        ns.tprintf("%s/%s: booting %s", server, action, threads);
-        ns.exec(script, server, threads, target.hostname);
-      }
-    }
+    await ns.sleep(10000);
   }
 }
 
-/** @param {NS} ns */
 function calculateThreads(
   ns: NS,
-  runnableServers: string[],
+  runnableServers: Ser[],
 ): { threadsPerServer: NumberDictionary; totalThreads: number } {
-  const scriptMemory = maxScriptMemory(ns);
-  ns.tprintf("Seems like each script will need %s", ns.formatRam(scriptMemory));
+  const scriptMemory = Math.max(
+    ns.getScriptRam("lsd/grow.js"),
+    ns.getScriptRam("lsd/weaken.js"),
+    ns.getScriptRam("lsd/hack.js"),
+  );
 
   let totalThreads = 0;
   let threadsPerServer: NumberDictionary = {};
 
   for (var i = 0; i < runnableServers.length; i++) {
     const server = runnableServers[i];
-    let availableMemory = ns.getServerMaxRam(server);
-    if (server == "home") {
-      const mr = ns.getServerMaxRam(server);
-      const us = ns.getServerUsedRam(server);
-      if (mr == 32) {
-        availableMemory = mr - us - 16;
-      } else {
-        availableMemory = mr - us - 32;
-      }
+    let availableMemory = ns.getServerMaxRam(server.hostname);
+    if (server.hostname == "home") {
+      availableMemory = availableMemory - 16;
     }
     const threads = Math.floor(availableMemory / scriptMemory);
 
-    threadsPerServer[server] = threads;
+    threadsPerServer[server.hostname] = threads;
     totalThreads += threads;
   }
-
-  ns.tprintf("We'd be able to run %s threads in total", totalThreads);
 
   return { threadsPerServer, totalThreads };
 }
 
-/** @param {NS} ns */
-function maxScriptMemory(ns: NS) {
-  let growScriptMemory = ns.getScriptRam("lsd/grow.js");
-  let weakenScriptMemory = ns.getScriptRam("lsd/weaken.js");
-  let hackScriptMemory = ns.getScriptRam("lsd/hack.js");
-
-  return Math.max(growScriptMemory, weakenScriptMemory, hackScriptMemory);
+function copyLibs(ns: NS, servers: Ser[]) {
+  const files = ns.ls("home", "lib").concat(ns.ls("home", "lsd"));
+  servers.forEach((server) => ns.scp(files, server.hostname));
 }

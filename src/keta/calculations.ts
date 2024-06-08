@@ -134,10 +134,10 @@ export function parametersForPercent(
   const cycleTime = weakenTime;
 
   const memoryPerSlot =
-    ns.getScriptRam("hack-hack.js") * hackThreads +
-    ns.getScriptRam("hack-weak1.js") * hackWeakenThreads +
-    ns.getScriptRam("hack-grow.js") * growThreads +
-    ns.getScriptRam("hack-weak2.js") * growWeakenThreads;
+    ns.getScriptRam("keta/k-hack.js") * hackThreads +
+    ns.getScriptRam("keta/k-weak1.js") * hackWeakenThreads +
+    ns.getScriptRam("keta/k-grow.js") * growThreads +
+    ns.getScriptRam("keta/k-weak2.js") * growWeakenThreads;
 
   return {
     hackThreads,

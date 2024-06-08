@@ -4,8 +4,10 @@ import { getKnownServers } from "lib/explore";
 import { isHackable } from "lib/hackable";
 import { toMoney } from "lib/money.js";
 
+export const HackingLevel = 0.4;
+
 export async function main(ns: NS): Promise<void> {
-  const topServers = topProfitableServers(ns, 15, ns.getHackingLevel() * 0.4);
+  const topServers = topProfitableServers(ns, 15, ns.getHackingLevel() * HackingLevel);
   ns.tprintf("Most profitable severs:");
   topServers.forEach((server) =>
     ns.tprintf(
@@ -20,7 +22,7 @@ export async function main(ns: NS): Promise<void> {
 }
 
 export function profitableServer(ns: NS): Server {
-  return topProfitableServers(ns, 1, ns.getHackingLevel() * 0.5)[0];
+  return topProfitableServers(ns, 1, ns.getHackingLevel() * HackingLevel)[0] || "foodnstuff";
 }
 
 /** @param {NS} ns */
