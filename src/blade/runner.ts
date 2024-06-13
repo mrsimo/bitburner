@@ -144,8 +144,16 @@ class BladeRunner {
     return current / max;
   }
 
-  private bestThingToWorkOn(): Action | null {
+  private bestThingToWorkOn(): Action | void {
     const ns = this.ns;
+
+    if (this.readyForBlackOp && this.nextBlackOp != null) {
+      this.nextBlackOp.setToOptimalCityAndLevel();
+
+      if (this.nextBlackOp.chance.average >= 0.7) {
+        return this.nextBlackOp;
+      }
+    }
 
     let maxLevel = 0;
     this.actions.forEach((action) => {
@@ -157,9 +165,9 @@ class BladeRunner {
 
     const prioMoney = this.readyForBlackOp;
     const priorities: StringNumberDictionary = {
-      Contracts: prioMoney ? 10.0 : 1.0,
-      Operations: prioMoney ? 1.0 : 10.0,
-      BlackOps: 50.0,
+      Contracts: prioMoney ? 100.0 : 1.0,
+      Operations: prioMoney ? 1.0 : 100.0,
+      BlackOps: 500.0,
     };
     let bestAction;
     let bestScore = 0;
@@ -176,11 +184,10 @@ class BladeRunner {
       }
     });
 
-    if (!bestAction) {
+    if (bestAction == null) {
       ns.tprintf("[blade]: No action found :(");
-      return null;
     } else {
-      ns.tprintf("[blade]: Best action is %s with score %s", bestAction.name, bestScore.toFixed(2));
+      // ns.tprintf("[blade]: Best action is %s with score %s", bestAction.name, bestScore.toFixed(2));
       return bestAction;
     }
   }

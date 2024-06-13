@@ -16,6 +16,7 @@ export class Action {
 
   start(): boolean {
     this.moveToOptimalCity();
+    this.setToOptimalLevel();
     return this.ns.bladeburner.startAction(this.type, this.name);
   }
 
@@ -32,14 +33,10 @@ export class Action {
 
   async startAndWait(): Promise<void> {
     if (this.start()) {
-      const level =
-        this.type != "General"
-          ? this.ns.bladeburner.getActionCurrentLevel(this.type, this.name)
-          : 0;
       this.ns.tprintf(
         "[blade]: Starting action: %s Lv.%s (%s)%s - %s (%s)",
         this.name,
-        level,
+        this.currentLevel,
         this.type,
         this.optimalCity ? this.ns.sprintf("- in %s", this.optimalCity) : "",
         this.actionScore.toFixed(2),
@@ -58,6 +55,10 @@ export class Action {
   adjustedActionScore(knownMaxLevel: number, multiplier: number): number {
     const adjustmentFactor = this.maxLevel / knownMaxLevel;
     return (this.actionScore / adjustmentFactor) * multiplier;
+  }
+
+  get currentLevel(): number {
+    return this.hasLevels ? this.ns.bladeburner.getActionCurrentLevel(this.type, this.name) : 1;
   }
 
   get maxLevel(): number {
@@ -95,30 +96,48 @@ export class Action {
     });
 
     this.optimalCity = maxCity;
+    this.moveToOptimalCity();
   }
 
   setToOptimalCityAndLevel(): void {
     this.setToOptimalCity();
     let score = 0;
     let previousScore = -1;
+    let actualLevel = 0;
     let level = 0;
+
     if (this.hasLevels) {
       level = this.maxLevel;
-      while (level >= 1 && score > previousScore) {
+
+      while (level >= 1) {
         this.ns.bladeburner.setActionLevel(this.type, this.name, level);
-        previousScore = score;
         score = this.actionScore;
-        level--;
+
+        if (score < previousScore) {
+          break;
+        } else {
+          previousScore = score;
+          actualLevel = level;
+          level--;
+        }
       }
     }
 
-    this.optimalLevel = level;
+    this.optimalLevel = actualLevel;
+  }
+
+  setToOptimalLevel(): void {
+    if (this.optimalLevel != null)
+      this.ns.bladeburner.setActionLevel(this.type, this.name, this.optimalLevel);
   }
 
   moveToOptimalCity(): void {
-    if (this.optimalCity != null)
+    if (this.optimalCity != null && this.optimalCity != undefined) {
       this.ns.bladeburner.switchCity(
-        this.ns.enums.CityName[this.optimalCity as keyof typeof CityName],
+        this.ns.enums.CityName[
+          this.optimalCity.replace(" ", "").replace("-", "") as keyof typeof CityName
+        ],
       );
+    }
   }
 }
