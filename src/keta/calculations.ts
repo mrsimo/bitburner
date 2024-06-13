@@ -58,7 +58,7 @@ export function parametersForPercent(
   padTime: number,
 ): KetaParameters {
   if (!target.server.moneyMax) {
-    ns.tprint("This server doesn't have the moneyMax attribute... this script won't work");
+    ns.tprintf("%s doesn't have the moneyMax attribute... this script won't work", target.hostname);
     ns.exit();
   }
   const player = ns.getPlayer();

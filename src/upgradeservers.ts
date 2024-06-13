@@ -12,7 +12,7 @@ export async function main(ns: NS): Promise<void> {
     ["twice", false],
   ]);
   const servers = ns.getPurchasedServers();
-  const ram = 2 * servers.map((server) => ns.getServerMaxRam(server)).sort()[0];
+  const ram = 2 * Math.min(...servers.map((server) => ns.getServerMaxRam(server)));
 
   ns.tprintf("Upgrading servers to " + ns.formatRam(ram));
 

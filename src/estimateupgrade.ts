@@ -6,32 +6,7 @@ export async function main(ns: NS): Promise<void> {
   let ram = 2 * ns.getServerMaxRam(servers[0]);
 
   ns.tprintf("Estimating upgrade of servers to " + ns.formatRam(ram));
-  let total = 0;
-
-  servers.forEach((server) => {
-    if (ns.getServerMaxRam(server) < ram) {
-      const cost = ns.getPurchasedServerUpgradeCost(server, ram);
-      total = total + cost;
-      ns.tprintf("%s: %s", server, toMoney(cost));
-    } else {
-      ns.tprintf("%s: $0 (already at expected memory size)", server);
-    }
-  });
-
-  ns.tprintf("Total: %s", toMoney(total));
-}
-
-export async function upgradeServer(ns: NS, server: string, ram: number) {
-  ns.tprint("Going to upgrade " + server + " to " + ram + "GB");
-
-  const cost = ns.getPurchasedServerUpgradeCost(server, ram);
-  while (true) {
-    if (ns.getServerMoneyAvailable("home") >= cost) {
-      ns.tprint("Upgrading server " + server + " for " + toMoney(cost));
-      ns.upgradePurchasedServer(server, ram);
-      break;
-    } else {
-      await ns.sleep(100);
-    }
-  }
+  const costs = servers.map((server) => ns.getPurchasedServerUpgradeCost(server, ram));
+  ns.tprintf("Costs: %s", costs.map((cost) => toMoney(cost)).join(", "));
+  ns.tprintf("Total: %s", toMoney(costs.reduce((a, b) => a + b, 0)));
 }

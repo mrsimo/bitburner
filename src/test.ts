@@ -2,9 +2,8 @@ import { NS } from "@ns";
 import { toMoney } from "lib/money";
 
 export async function main(ns: NS): Promise<void> {
-  ns.tprint(ns.getPlayer().karma);
-  ns.tprint(ns.getPlayer().numPeopleKilled);
-
+  // ns.tprint(ns.getPlayer().karma);
+  // ns.tprint(ns.getPlayer().numPeopleKilled);
   // const mults = ns.getBitNodeMultipliers();
   // for (const key in mults) {
   //   const value = mults[key];

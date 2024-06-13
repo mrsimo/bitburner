@@ -1680,7 +1680,13 @@ export interface GraftingTask {
  * Represents any task, such as studying, working for a faction etc.
  * @public
  */
-export type Task = StudyTask | CompanyWorkTask | CreateProgramWorkTask | CrimeTask | FactionWorkTask | GraftingTask;
+export type Task =
+  | StudyTask
+  | CompanyWorkTask
+  | CreateProgramWorkTask
+  | CrimeTask
+  | FactionWorkTask
+  | GraftingTask;
 
 /**
  * Singularity API
@@ -1999,7 +2005,10 @@ export interface Singularity {
    * @param field - Field to which you want to apply.
    * @returns True if the player successfully get a job/promotion, and false otherwise.
    */
-  applyToCompany(companyName: CompanyName | `${CompanyName}`, field: JobField | `${JobField}`): JobName | null;
+  applyToCompany(
+    companyName: CompanyName | `${CompanyName}`,
+    field: JobField | `${JobField}`,
+  ): JobName | null;
 
   /**
    * Get company reputation.
@@ -2147,7 +2156,11 @@ export interface Singularity {
    * @param focus - Acquire player focus on this work operation. Optional. Defaults to true.
    * @returns True if the player starts working, and false otherwise.
    */
-  workForFaction(faction: string, workType: FactionWorkType | `${FactionWorkType}`, focus?: boolean): boolean;
+  workForFaction(
+    faction: string,
+    workType: FactionWorkType | `${FactionWorkType}`,
+    focus?: boolean,
+  ): boolean;
 
   /**
    * Get faction reputation.
@@ -3132,7 +3145,7 @@ export interface Bladeburner {
    * @param level - Optional number. Action level at which to calculate the gain. Will be the action's current level if not given.
    * @returns Average Bladeburner reputation gain for successfully completing the specified action.
    */
-  getActionRepGain(type: string, name: string, level: number): number;
+  getActionRepGain(type: string, name: string, level?: number): number;
 
   /**
    * Get action count remaining.
@@ -3329,7 +3342,7 @@ export interface Bladeburner {
    * @param name - Name of action. Must be an exact match.
    * @returns Number of Bladeburner team members that were assigned to the specified action.
    */
-  getTeamSize(type: string, name: string): number;
+  getTeamSize(type?: string, name?: string): number;
 
   /**
    * Set team size.
@@ -4028,12 +4041,12 @@ export interface Go {
    *
    * For example, a 5x5 board might look like this:
    *
-   [<br/>  
-      "XX.O.",<br/>  
-      "X..OO",<br/>  
-      ".XO..",<br/>  
-      "XXO.#",<br/>  
-      ".XO.#",<br/>  
+   [<br/>
+      "XX.O.",<br/>
+      "X..OO",<br/>
+      ".XO..",<br/>
+      "XXO.#",<br/>
+      ".XO.#",<br/>
    ]
    *
    * Each string represents a vertical column on the board, and each character in the string represents a point.
@@ -4671,7 +4684,11 @@ interface WorkFormulas {
     locationName: string,
   ): WorkStats;
   /** @returns The WorkStats applied every game cycle (200ms) by performing the specified faction work. */
-  factionGains(person: Person, workType: FactionWorkType | `${FactionWorkType}`, favor: number): WorkStats;
+  factionGains(
+    person: Person,
+    workType: FactionWorkType | `${FactionWorkType}`,
+    favor: number,
+  ): WorkStats;
   /** @returns The WorkStats applied every game cycle (200ms) by performing the specified company work. */
   companyGains(
     person: Person,
@@ -4881,7 +4898,13 @@ interface HacknetServersFormulas {
    * @param mult - player production mult (default to 1)
    * @returns The calculated hash gain rate.
    */
-  hashGainRate(level: number, ramUsed: number, maxRam: number, cores: number, mult?: number): number;
+  hashGainRate(
+    level: number,
+    ramUsed: number,
+    maxRam: number,
+    cores: number,
+    mult?: number,
+  ): number;
   /**
    * Calculate cost of upgrading hacknet server level.
    * @param startingLevel - starting level
@@ -6196,7 +6219,12 @@ export interface NS {
    * @param args - Additional arguments to pass into the new script that is being run. Note that if any arguments are being passed into the new script, then the third argument threadOrOptions must be filled in with a value.
    * @returns Returns the PID of a successfully started script, and 0 otherwise.
    */
-  exec(script: string, hostname: string, threadOrOptions?: number | RunOptions, ...args: ScriptArg[]): number;
+  exec(
+    script: string,
+    hostname: string,
+    threadOrOptions?: number | RunOptions,
+    ...args: ScriptArg[]
+  ): number;
 
   /**
    * Terminate current script and start another in a defined number of milliseconds.
@@ -6637,7 +6665,11 @@ export interface NS {
    * @param args  - Arguments to specify/identify the script. Optional, when looking for scripts run without arguments.
    * @returns The info about the running script if found, and null otherwise.
    */
-  getRunningScript(filename?: FilenameOrPID, hostname?: string, ...args: ScriptArg[]): RunningScript | null;
+  getRunningScript(
+    filename?: FilenameOrPID,
+    hostname?: string,
+    ...args: ScriptArg[]
+  ): RunningScript | null;
 
   /**
    * Get cost of purchasing a server.
@@ -7127,7 +7159,12 @@ export interface NS {
    * @param isInteger - Whether the number represents an integer. Integers do not display fractional digits until a suffix is present. Optional, defaults to false.
    * @returns Formatted number.
    */
-  formatNumber(n: number, fractionalDigits?: number, suffixStart?: number, isInteger?: boolean): string;
+  formatNumber(
+    n: number,
+    fractionalDigits?: number,
+    suffixStart?: number,
+    isInteger?: boolean,
+  ): string;
 
   /**
    * Format a number as an amount of ram.
@@ -7455,7 +7492,9 @@ export interface NS {
    * // {"_":[],"delay":0,"server":"foodnstuff","exclude":[],"help":false,"v":true}
    * ```
    */
-  flags(schema: [string, string | number | boolean | string[]][]): { [key: string]: ScriptArg | string[] };
+  flags(schema: [string, string | number | boolean | string[]][]): {
+    [key: string]: ScriptArg | string[];
+  };
 
   /**
    * Share the server's ram with your factions.
@@ -7768,7 +7807,11 @@ export interface OfficeAPI {
    * @param employeePosition - Position to place into. Defaults to "Unassigned".
    * @returns True if an employee was hired, false otherwise
    */
-  hireEmployee(divisionName: string, city: CityName | `${CityName}`, employeePosition?: CorpEmployeePosition): boolean;
+  hireEmployee(
+    divisionName: string,
+    city: CityName | `${CityName}`,
+    employeePosition?: CorpEmployeePosition,
+  ): boolean;
   /**
    * Upgrade office size.
    * @param divisionName - Name of the division
@@ -7843,7 +7886,12 @@ export interface OfficeAPI {
    * @param amount - Number of employees to assign to that job
    * @returns true if the employee count reached the target amount, false if not
    */
-  setAutoJobAssignment(divisionName: string, city: CityName | `${CityName}`, job: string, amount: number): boolean;
+  setAutoJobAssignment(
+    divisionName: string,
+    city: CityName | `${CityName}`,
+    job: string,
+    amount: number,
+  ): boolean;
   /**
    * Cost to Upgrade office size.
    * @param divisionName - Name of the division
@@ -7851,7 +7899,11 @@ export interface OfficeAPI {
    * @param size - Amount of positions to open
    * @returns Cost of upgrading the office
    */
-  getOfficeSizeUpgradeCost(divisionName: string, city: CityName | `${CityName}`, size: number): number;
+  getOfficeSizeUpgradeCost(
+    divisionName: string,
+    city: CityName | `${CityName}`,
+    size: number,
+  ): number;
 }
 
 /**
@@ -7926,7 +7978,12 @@ export interface WarehouseAPI {
    * @param materialName - Name of the material
    * @param amt - Amount of material to buy
    */
-  buyMaterial(divisionName: string, city: CityName | `${CityName}`, materialName: string, amt: number): void;
+  buyMaterial(
+    divisionName: string,
+    city: CityName | `${CityName}`,
+    materialName: string,
+    amt: number,
+  ): void;
   /**
    * Set material to bulk buy
    * @param divisionName - Name of the division
@@ -7934,7 +7991,12 @@ export interface WarehouseAPI {
    * @param materialName - Name of the material
    * @param amt - Amount of material to buy
    */
-  bulkPurchase(divisionName: string, city: CityName | `${CityName}`, materialName: string, amt: number): void;
+  bulkPurchase(
+    divisionName: string,
+    city: CityName | `${CityName}`,
+    materialName: string,
+    amt: number,
+  ): void;
 
   /** Get warehouse data
    * @param divisionName - Name of the division
@@ -7947,7 +8009,11 @@ export interface WarehouseAPI {
    * @param cityName - Name of the city
    * @param productName - Name of the product
    * @returns product data */
-  getProduct(divisionName: string, cityName: CityName | `${CityName}`, productName: string): Product;
+  getProduct(
+    divisionName: string,
+    cityName: CityName | `${CityName}`,
+    productName: string,
+  ): Product;
   /**
    * Get material data
    * @param divisionName - Name of the division
@@ -7963,7 +8029,12 @@ export interface WarehouseAPI {
    * @param materialName - Name of the material
    * @param on - market ta enabled
    */
-  setMaterialMarketTA1(divisionName: string, city: CityName | `${CityName}`, materialName: string, on: boolean): void;
+  setMaterialMarketTA1(
+    divisionName: string,
+    city: CityName | `${CityName}`,
+    materialName: string,
+    on: boolean,
+  ): void;
   /**
    * Set market TA 2 for a material.
    * @param divisionName - Name of the division
@@ -7971,7 +8042,12 @@ export interface WarehouseAPI {
    * @param materialName - Name of the material
    * @param on - market ta enabled
    */
-  setMaterialMarketTA2(divisionName: string, city: CityName | `${CityName}`, materialName: string, on: boolean): void;
+  setMaterialMarketTA2(
+    divisionName: string,
+    city: CityName | `${CityName}`,
+    materialName: string,
+    on: boolean,
+  ): void;
 
   /** * Set market TA 1 for a product.
    * @param divisionName - Name of the division
@@ -8064,7 +8140,12 @@ export interface WarehouseAPI {
    * @param productName - Name of the product.
    * @param qty - Amount to limit to. Pass a negative value to remove the limit instead.
    */
-  limitProductProduction(divisionName: string, city: CityName | `${CityName}`, productName: string, qty: number): void;
+  limitProductProduction(
+    divisionName: string,
+    city: CityName | `${CityName}`,
+    productName: string,
+    qty: number,
+  ): void;
   /**
    * Gets the cost to upgrade a warehouse to the next level
    * @param divisionName - Name of the division
@@ -8072,7 +8153,11 @@ export interface WarehouseAPI {
    * @param amt - amount of upgrades. Optional, defaults to 1
    * @returns cost to upgrade
    */
-  getUpgradeWarehouseCost(divisionName: string, city: CityName | `${CityName}`, amt?: number): number;
+  getUpgradeWarehouseCost(
+    divisionName: string,
+    city: CityName | `${CityName}`,
+    amt?: number,
+  ): number;
   /**
    * Check if you have a warehouse in city
    * @returns true if warehouse is present, false if not
@@ -8744,7 +8829,9 @@ interface AutocompleteData {
   servers: string[];
   scripts: string[];
   txts: string[];
-  flags(schema: [string, string | number | boolean | string[]][]): { [key: string]: ScriptArg | string[] };
+  flags(schema: [string, string | number | boolean | string[]][]): {
+    [key: string]: ScriptArg | string[];
+  };
 }
 
 /**

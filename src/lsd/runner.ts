@@ -25,7 +25,7 @@ export async function main(ns: NS): Promise<void> {
 
   const target =
     ns.args.length >= 1 ? new Ser(ns, String(ns.args[0])) : new Ser(ns, profitableServer(ns));
-  let useHome = true;
+  let useHome = false;
 
   const debug = ns.args.length >= 2 ? String(ns.args[1]) == "--debug" : false;
 
@@ -104,7 +104,7 @@ export async function main(ns: NS): Promise<void> {
         ns.tprint(needs);
         ns.tprintf(
           "[lsd] %s: We need fewer threads of %s: %s vs %s! Giving up!",
-          ac,
+          action,
           action,
           haves[action],
           needs[action],
@@ -157,7 +157,7 @@ function calculateThreads(
     const server = runnableServers[i];
     let availableMemory = ns.getServerMaxRam(server.hostname);
     if (server.hostname == "home") {
-      availableMemory = availableMemory - 16;
+      availableMemory = availableMemory - 64;
     }
     const threads = Math.floor(availableMemory / scriptMemory);
 

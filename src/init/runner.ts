@@ -49,7 +49,7 @@ export async function main(ns: NS): Promise<void> {
    */
   while (true) {
     handleBackdoors(ns);
-    handleFactions(ns);
+    // handleFactions(ns);
     handleBuyingHacks(ns);
     handleRunningHacks(ns);
     handleUpgradingServers(ns);
@@ -92,15 +92,15 @@ function handleBackdoors(ns: NS): void {
 }
 
 // TODO: handle The Syndicate and others that only have the CIA etc as enemies
-function handleFactions(ns: NS): void {
-  ns.singularity.checkFactionInvitations().forEach((faction) => {
-    const enemies = ns.singularity.getFactionEnemies(faction);
-    if (enemies.length == 0) {
-      ns.tprintf("[init] Joining faction %s", faction);
-      ns.singularity.joinFaction(faction);
-    }
-  });
-}
+// function handleFactions(ns: NS): void {
+//   ns.singularity.checkFactionInvitations().forEach((faction) => {
+//     const enemies = ns.singularity.getFactionEnemies(faction);
+//     if (enemies.length == 0) {
+//       ns.tprintf("[init] Joining faction %s", faction);
+//       ns.singularity.joinFaction(faction);
+//     }
+//   });
+// }
 
 /**
  * Takes care of buying hacking programs
@@ -111,10 +111,10 @@ const HackPrograms = [
   "HTTPWorm.exe",
   "SQLInject.exe",
   "Formulas.exe",
-  "AutoLink.exe",
-  "DeepscanV1.exe",
-  "DeepscanV2.exe",
-  "ServerProfiler.exe",
+  // "AutoLink.exe",
+  // "DeepscanV1.exe",
+  // "DeepscanV2.exe",
+  // "ServerProfiler.exe",
 ];
 function handleBuyingHacks(ns: NS): void {
   HackPrograms.filter((program) => !ns.fileExists(program, "home")).forEach((program) => {
@@ -147,7 +147,7 @@ function handleRunningHacks(ns: NS): void {
   }
 }
 
-const KetaThreshold = 2 ** 13; // 8TB
+const KetaThreshold = 2 ** 8; // 128GB
 function ketaOrLsd(ns: NS): "keta" | "lsd" {
   if (
     ns.getPurchasedServers().length >= ns.getPurchasedServerLimit() &&
@@ -178,7 +178,6 @@ function handleUpgradingServers(ns: NS): void {
     })
     .reduce((acc, cost) => acc + cost, 0);
 
-  ns.infiltration.getInfiltration;
   if (cost <= ns.getServerMoneyAvailable("home")) {
     ns.exec("upgradeservers.js", "home", 1, "--brief=true");
   }
@@ -195,6 +194,7 @@ function handleShares(ns: NS): void {
       ns.getScriptRam("init/backdoor.js") -
       ns.getScriptRam("upgradeservers.js") -
       ns.getScriptRam("share.js") -
+      ns.getScriptRam("blade/runner.js") -
       hackMemReq) *
     0.9;
   const shareMemReq = ns.getScriptRam("share.js");

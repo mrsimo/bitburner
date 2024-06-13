@@ -21,7 +21,7 @@ interface KetaParametersDictionary {
 
 export async function main(ns: NS): Promise<void> {
   ns.disableLog("ALL");
-  ns.enableLog("exec");
+  // ns.enableLog("exec");
 
   const options = ns.flags([
     ["target", []],
@@ -73,12 +73,13 @@ export async function main(ns: NS): Promise<void> {
         .sort((a, b) => b.moneyMax - a.moneyMax);
 
       ns.printf("[debug]: candidates: %s", candidates.map((target) => target.hostname).join(", "));
+      await ns.sleep(1000);
 
       let pool: Ser[] = [];
       for (let i = 0; i < candidates.length; i++) {
         const candidate = candidates[i];
         pool.push(candidate);
-        const optimal = optimalParameters(ns, pool, serverMemory / pool.length, 50);
+        const optimal = optimalParameters(ns, pool, serverMemory / pool.length, 25);
         ns.printf(
           "[debug]: optimal for %s is %s percent",
           candidate.hostname,
@@ -96,6 +97,11 @@ export async function main(ns: NS): Promise<void> {
       const maxMoney = Math.max(...pool.map((target) => target.moneyMax));
       targets = pool.filter((target) => target.moneyMax > maxMoney / 3);
       targets.forEach((target) => h4ck(ns, target.hostname));
+
+      if (targets.length === 0) {
+        ns.tprintf("Impossible to find suitable targets. Exiting.");
+        ns.exit();
+      }
     }
 
     ns.printf("[debug] targets: %s", targets.map((target) => target.hostname).join(", "));
@@ -190,11 +196,13 @@ function optimalParameters(
 ): KetaParametersDictionary {
   let parametersPerTarget: KetaParametersDictionary = {};
   targets.forEach((target) => {
-    for (let percent = 100; percent >= minPercent; percent--) {
-      const pars = parametersForPercent(ns, percent, target, PadTime);
-      if (pars.memoryPerSlot < maxMemPerTarget) {
-        parametersPerTarget[target.hostname] = pars;
-        break;
+    if (target.moneyMax) {
+      for (let percent = 100; percent >= minPercent; percent--) {
+        const pars = parametersForPercent(ns, percent, target, PadTime);
+        if (pars.memoryPerSlot < maxMemPerTarget) {
+          parametersPerTarget[target.hostname] = pars;
+          break;
+        }
       }
     }
   });
