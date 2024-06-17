@@ -1,14 +1,17 @@
 import { NS } from "@ns";
-import { toMoney } from "lib/money";
 
 export async function main(ns: NS): Promise<void> {
-  // ns.tprint(ns.getPlayer().karma);
-  // ns.tprint(ns.getPlayer().numPeopleKilled);
-  // const mults = ns.getBitNodeMultipliers();
-  // for (const key in mults) {
-  //   const value = mults[key];
-  //   if (value != 1) {
-  //     ns.tprintf("%s: %s", key, Math.round(value * 100) + "%");
-  //   }
+  ns.singularity.workForFaction("Speakers for the Dead", "security");
+  while (ns.singularity.getFactionRep("Speakers for the Dead") < 750000) {
+    await ns.sleep(10000);
+  }
+
+  // ns.singularity.workForFaction("Speakers for the Dead", "security");
+  // while (ns.singularity.getFactionRep("Speakers for the Dead") < 400000) {
+  //   await ns.sleep(10000);
   // }
+
+  ns.spawn("blade/runner.js");
+
+  // ns.tprint(ns.singularity.getAugmentationFactions("BrachiBlades"));
 }

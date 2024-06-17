@@ -6,9 +6,9 @@ import { toMoney } from "/lib/money";
 import { KetaParameters } from "/keta/calculations";
 
 export async function main(ns: NS): Promise<void> {
-  if (ns.getHackingLevel() < 10) {
-    ns.spawn("init/sub10.js", { spawnDelay: 1000 });
-  }
+  // if (ns.getHackingLevel() < 10) {
+  //   ns.spawn("init/sub10.js", { spawnDelay: 1000 });
+  // }
 
   // Oneshot to make sure LSD or KETA is running, just in case
   handleRunningHacks(ns);
@@ -49,7 +49,7 @@ export async function main(ns: NS): Promise<void> {
    */
   while (true) {
     handleBackdoors(ns);
-    // handleFactions(ns);
+    handleFactions(ns);
     handleBuyingHacks(ns);
     handleRunningHacks(ns);
     handleUpgradingServers(ns);
@@ -92,15 +92,15 @@ function handleBackdoors(ns: NS): void {
 }
 
 // TODO: handle The Syndicate and others that only have the CIA etc as enemies
-// function handleFactions(ns: NS): void {
-//   ns.singularity.checkFactionInvitations().forEach((faction) => {
-//     const enemies = ns.singularity.getFactionEnemies(faction);
-//     if (enemies.length == 0) {
-//       ns.tprintf("[init] Joining faction %s", faction);
-//       ns.singularity.joinFaction(faction);
-//     }
-//   });
-// }
+function handleFactions(ns: NS): void {
+  ns.singularity.checkFactionInvitations().forEach((faction) => {
+    const enemies = ns.singularity.getFactionEnemies(faction);
+    if (enemies.length == 0) {
+      ns.tprintf("[init] Joining faction %s", faction);
+      ns.singularity.joinFaction(faction);
+    }
+  });
+}
 
 /**
  * Takes care of buying hacking programs
@@ -135,7 +135,8 @@ function handleRunningHacks(ns: NS): void {
       }
       if (!ns.scriptRunning("keta/runner.js", "home")) {
         ns.tprintf("[init] Starting KETA runner");
-        ns.exec("keta/runner.js", "home", 1, "--dynamic=true");
+        // ns.exec("keta/runner.js", "home", 1, "--dynamic=true");
+        ns.exec("keta/runner.js", "home", 1);
       }
       break;
     case "lsd":
@@ -147,7 +148,7 @@ function handleRunningHacks(ns: NS): void {
   }
 }
 
-const KetaThreshold = 2 ** 8; // 128GB
+const KetaThreshold = 2 ** 7; // 128GB
 function ketaOrLsd(ns: NS): "keta" | "lsd" {
   if (
     ns.getPurchasedServers().length >= ns.getPurchasedServerLimit() &&
@@ -195,6 +196,7 @@ function handleShares(ns: NS): void {
       ns.getScriptRam("upgradeservers.js") -
       ns.getScriptRam("share.js") -
       ns.getScriptRam("blade/runner.js") -
+      ns.getScriptRam("go/runner.js") -
       hackMemReq) *
     0.9;
   const shareMemReq = ns.getScriptRam("share.js");

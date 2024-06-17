@@ -4,15 +4,20 @@ import { Position } from "go/position";
 
 export async function main(ns: NS): Promise<void> {
   ns.disableLog("ALL");
-  const options = ns.flags([
-    ["opponent", "Illuminati"],
-    ["size", 7],
-  ]);
-  const opponent = String(options.opponent);
-  const size = Number(options.size);
 
   // @ts-ignore
-  await new GoGame(ns, opponent, size).run();
+  const size = 7;
+  const games = [
+    new GoGame(ns, "The Black Hand", size),
+    new GoGame(ns, "Tetrads", size),
+    new GoGame(ns, "Daedalus", size),
+    new GoGame(ns, "Illuminati", size),
+  ];
+  while (true) {
+    for (const game of games) {
+      await game.run();
+    }
+  }
 }
 
 class GoGame {
@@ -56,7 +61,7 @@ class GoGame {
           lastKnownPlayer == "Black" ? gameState.blackScore : gameState.whiteScore,
           lastKnownPlayer == "Black" ? gameState.whiteScore : gameState.blackScore,
         );
-        this.restart();
+        break;
       }
     }
   }

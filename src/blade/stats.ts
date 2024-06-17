@@ -16,7 +16,7 @@ export async function main(ns: NS): Promise<void> {
     }
   });
 
-  const prioMoney = true;
+  const prioMoney = false;
   const priorities: StringNumberDictionary = {
     Contracts: prioMoney ? 100.0 : 1.0,
     Operations: prioMoney ? 1.0 : 100.0,
@@ -53,8 +53,12 @@ function preloadActions(ns: NS): Action[] {
     if (!AvoidTasks.includes(name)) actions.push(new Action(ns, "Operations", name));
   });
 
-  const blackOp = ns.bladeburner.getNextBlackOp();
-  if (blackOp) actions.push(new Action(ns, "BlackOps", blackOp.name));
+  // const blackOp = ns.bladeburner.getNextBlackOp();
+  // if (blackOp) actions.push(new Action(ns, "BlackOps", blackOp.name));
+
+  ns.bladeburner.getBlackOpNames().forEach((name) => {
+    if (!AvoidTasks.includes(name)) actions.push(new Action(ns, "BlackOps", name));
+  });
 
   return actions;
 }

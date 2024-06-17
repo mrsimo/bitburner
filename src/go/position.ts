@@ -63,7 +63,7 @@ export class Position {
     );
 
     if (isThreatened) {
-      // To detect if that network can be saved, esure the new move will not immediately allow the opponent to capture:
+      // To detect if that network can be saved, ensure the new move will not immediately allow the opponent to capture:
       // * That empty point ALSO has two or more empty points adjacent to it [a "." via getBoardState()], OR
       // * That empty point has a friendly network adjacent to it, and that network has 3 or more liberties [via getLiberties()]
       const atLeastTwoEmpties =
